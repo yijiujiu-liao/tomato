@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#25635a">
+  <title>50:00 - 考研番茄钟</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <header class="hero">
+      <div class="top-bar">
+        <p class="eyebrow">考研学习助手</p>
+        <button class="theme-toggle" id="themeToggle" type="button">深色模式</button>
+      </div>
+      <h1>番茄钟</h1>
+      <p class="subtitle" id="subtitle">专注 50 分钟，休息一下，再回来继续。</p>
+    </header>
+
+    <div class="page-shell">
+      <section class="app-page active" data-page="timer" aria-label="计时页">
+        <section class="card timer-card" aria-label="番茄钟计时器">
+          <div class="mode-tabs" aria-label="模式切换">
+            <button class="mode-btn active" data-mode="focus">专注 50</button>
+            <button class="mode-btn" data-mode="short">短休 5</button>
+            <button class="mode-btn" data-mode="long">长休 10</button>
+          </div>
+
+          <div class="duration-setting">
+            <label for="focusDurationInput">专注时长</label>
+            <div class="duration-input-row">
+              <input id="focusDurationInput" type="number" min="1" max="180" step="1" inputmode="numeric">
+              <span>分钟</span>
+            </div>
+            <p class="hint">可按自己的节奏设置，1 到 180 分钟。</p>
+          </div>
+
+          <div class="timer-display" id="timerDisplay" aria-live="polite">50:00</div>
+          <div class="timer-progress" aria-label="当前倒计时进度">
+            <div class="timer-progress-fill" id="timerProgressFill"></div>
+          </div>
+          <p class="progress-text" id="timerProgressText">本轮已完成 0%</p>
+          <p class="status-text" id="statusText">准备开始今天的第一轮专注。</p>
+
+          <div class="controls">
+            <button class="primary-btn" id="startBtn">开始</button>
+            <button class="secondary-btn" id="pauseBtn">暂停</button>
+            <button class="secondary-btn" id="resetBtn">重置</button>
+          </div>
+        </section>
+      </section>
+
+      <section class="app-page" data-page="tasks" aria-label="任务页">
+        <section class="card task-card" aria-label="当前学习任务">
+          <label for="taskInput">当前学习任务</label>
+          <input id="taskInput" type="text" placeholder="例如：数学强化第 3 讲" maxlength="40">
+          <p class="hint">任务名会自动保存，下次打开还在。</p>
+        </section>
+
+        <section class="card records-card" aria-label="今日学习记录">
+          <div class="section-title">
+            <h2>今日学习记录</h2>
+            <button class="text-btn" id="clearRecordsBtn">清空</button>
+          </div>
+          <ul class="records-list" id="recordsList">
+            <li class="empty-record">还没有记录，完成一个专注番茄后会出现在这里。</li>
+          </ul>
+        </section>
+      </section>
+
+      <section class="app-page" data-page="stats" aria-label="统计页">
+        <section class="card goal-card" aria-label="今日目标">
+          <div class="section-title">
+            <h2>今日目标</h2>
+            <span class="goal-progress-text" id="goalProgressText">0 / 8 个番茄</span>
+          </div>
+          <label for="goalInput">目标番茄钟数量</label>
+          <input id="goalInput" type="number" min="1" max="24" step="1" inputmode="numeric">
+          <div class="goal-progress" aria-label="今日目标完成进度">
+            <div class="goal-progress-fill" id="goalProgressFill"></div>
+          </div>
+          <p class="hint">例如设置为 8，完成 8 个专注番茄就是今日达标。</p>
+        </section>
+
+        <section class="stats-grid" aria-label="今日统计">
+          <article class="stat-card">
+            <span class="stat-number" id="doneCount">0</span>
+            <span class="stat-label">今日专注次数</span>
+          </article>
+          <article class="stat-card">
+            <span class="stat-number" id="focusMinutes">0</span>
+            <span class="stat-label">今日专注总分钟数</span>
+          </article>
+        </section>
+      </section>
+    </div>
+
+    <nav class="bottom-nav" aria-label="功能分页">
+      <button class="nav-btn active" type="button" data-page-target="timer">
+        <span class="nav-icon">◷</span>
+        <span>计时</span>
+      </button>
+      <button class="nav-btn" type="button" data-page-target="tasks">
+        <span class="nav-icon">□</span>
+        <span>任务</span>
+      </button>
+      <button class="nav-btn" type="button" data-page-target="stats">
+        <span class="nav-icon">▥</span>
+        <span>统计</span>
+      </button>
+    </nav>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
