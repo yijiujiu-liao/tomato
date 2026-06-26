@@ -8,10 +8,10 @@ const ASSETS = [
   "./icon-192.png",
   "./icon-512.png",
   "./icon.svg",
-  "./assets/pets/penguin.png",
-  "./assets/pets/purple-dragon.png",
-  "./assets/pets/green-dino.png",
-  "./assets/pets/chick.png"
+  "./assets/pets/penguin.webp",
+  "./assets/pets/purple-dragon.webp",
+  "./assets/pets/green-dino.webp",
+  "./assets/pets/chick.webp"
 ];
 
 self.addEventListener("install", (event) => {

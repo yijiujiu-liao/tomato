@@ -23,22 +23,22 @@ const REST_DURATIONS = {
 const PET_TYPES = {
   penguin: {
     name: "蓝莓企鹅",
-    src: "assets/pets/penguin.png",
+    src: "assets/pets/penguin.webp",
     accent: "#9fc7ea"
   },
   purpleDragon: {
     name: "紫晶小龙",
-    src: "assets/pets/purple-dragon.png",
+    src: "assets/pets/purple-dragon.webp",
     accent: "#9b6ee8"
   },
   greenDino: {
     name: "青叶恐龙",
-    src: "assets/pets/green-dino.png",
+    src: "assets/pets/green-dino.webp",
     accent: "#94bd55"
   },
   chick: {
     name: "奶油小鸡",
-    src: "assets/pets/chick.png",
+    src: "assets/pets/chick.webp",
     accent: "#f3c34a"
   }
 };
