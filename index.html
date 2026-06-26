@@ -22,12 +22,64 @@
 
     <div class="page-shell">
       <section class="app-page active" data-page="timer" aria-label="计时页">
-        <section class="card timer-card" aria-label="番茄钟计时器">
+        <section class="card timer-card" data-mode="focus" aria-label="番茄钟计时器">
           <div class="mode-tabs" aria-label="模式切换">
             <button class="mode-btn active" data-mode="focus">专注 50</button>
-            <button class="mode-btn" data-mode="short">短休 5</button>
-            <button class="mode-btn" data-mode="long">长休 10</button>
+            <button class="mode-btn" data-mode="rest">休息 5</button>
           </div>
+
+          <section class="pet-panel" aria-label="专注宠物进化器">
+            <div class="section-title pet-title-row">
+              <h2>专注宠物</h2>
+              <span class="pet-meta" id="petStageLabel">幼体</span>
+            </div>
+            <div class="pet-picker" id="petPicker" aria-label="选择要培养的宠物"></div>
+            <div class="pet-shell" id="petShell" data-stage="juvenile" role="button" tabindex="0" aria-label="查看宠物进化预览">
+              <div class="pet-aura"></div>
+              <div class="pet-art" id="petArt" aria-live="polite"></div>
+              <div class="xp-toast" id="xpToast" aria-live="polite"></div>
+            </div>
+            <div class="pet-identity">
+              <p class="pet-name" id="petName">蓝莓企鹅</p>
+              <span class="pet-level" id="petLevelLabel">Lv.1</span>
+            </div>
+            <p class="pet-status" id="petStatus">完成番茄钟，宠物会获得经验并慢慢进化。</p>
+            <div class="pet-progress" aria-label="宠物经验进度">
+              <div class="pet-progress-fill" id="petProgressFill"></div>
+            </div>
+            <div class="pet-xp-row">
+              <span id="petXPText">0 / 100 XP</span>
+              <span id="evolutionHint">距离下一阶段还差 4 级</span>
+            </div>
+            <div class="pet-stats">
+              <span id="streakCount">今日连续 0</span>
+              <span id="petTotalXP">累计 0 XP</span>
+            </div>
+          </section>
+
+          <section class="rest-panel" aria-label="休息恢复页">
+            <div class="rest-scene" aria-hidden="true">
+              <div class="rest-orb">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+              <div class="rest-cloud rest-cloud-one"></div>
+              <div class="rest-cloud rest-cloud-two"></div>
+              <div class="rest-leaf rest-leaf-one"></div>
+              <div class="rest-leaf rest-leaf-two"></div>
+            </div>
+            <div class="section-title rest-title-row">
+              <h2>休息一下</h2>
+              <span class="rest-meta" id="restTypeLabel">短休 5 分钟</span>
+            </div>
+            <p class="rest-copy" id="restCopy">把手机放低一点，肩膀松开，慢慢呼吸。</p>
+            <div class="rest-tips" aria-label="休息建议">
+              <span>看远处</span>
+              <span>喝口水</span>
+              <span>放松手腕</span>
+            </div>
+          </section>
 
           <div class="duration-setting">
             <label for="focusDurationInput">专注时长</label>
@@ -35,7 +87,13 @@
               <input id="focusDurationInput" type="number" min="1" max="180" step="1" inputmode="numeric">
               <span>分钟</span>
             </div>
-            <p class="hint">可按自己的节奏设置，1 到 180 分钟。</p>
+          </div>
+
+          <div class="current-task-setting">
+            <label for="currentTaskSelect">当前任务</label>
+            <select id="currentTaskSelect" aria-label="选择当前专注任务">
+              <option value="">暂未选择任务</option>
+            </select>
           </div>
 
           <div class="timer-display" id="timerDisplay" aria-live="polite">50:00</div>
@@ -53,11 +111,30 @@
         </section>
       </section>
 
-      <section class="app-page" data-page="tasks" aria-label="任务页">
-        <section class="card task-card" aria-label="当前学习任务">
-          <label for="taskInput">当前学习任务</label>
-          <input id="taskInput" type="text" placeholder="例如：数学强化第 3 讲" maxlength="40">
-          <p class="hint">任务名会自动保存，下次打开还在。</p>
+      <section class="app-page" data-page="tasks" aria-label="今日计划页">
+        <section class="card task-card plan-card" aria-label="今日学习计划">
+          <div class="plan-header">
+            <div>
+              <p class="plan-date" id="todayDateText">今天</p>
+              <h2>今天要完成什么？</h2>
+              <p class="hint">先列清楚，再开始专注。</p>
+            </div>
+            <span class="plan-progress" id="planProgressText">已完成 0 / 0</span>
+          </div>
+
+          <div class="carry-over-banner" id="carryOverBanner" hidden>
+            <span id="carryOverText">昨日有 0 个未完成任务</span>
+            <button class="text-btn" id="carryOverBtn" type="button">带入今天</button>
+          </div>
+
+          <div class="task-add-row">
+            <input id="newTaskInput" type="text" placeholder="例如：数学强化第 3 讲" maxlength="60">
+            <button class="primary-btn add-task-btn" id="addTaskBtn" type="button">添加</button>
+          </div>
+
+          <ul class="plan-task-list" id="taskList" aria-label="今日任务列表">
+            <li class="empty-record">暂无任务，先添加一个今天要做的事。</li>
+          </ul>
         </section>
 
         <section class="card records-card" aria-label="今日学习记录">
@@ -113,6 +190,25 @@
       </button>
     </nav>
   </main>
+
+  <div class="pet-modal" id="petModal" aria-hidden="true">
+    <div class="pet-modal-card" role="dialog" aria-modal="true" aria-labelledby="petModalTitle">
+      <div class="pet-modal-head">
+        <div>
+          <p class="pet-modal-kicker">进化预览</p>
+          <h2 id="petModalTitle">宠物详情</h2>
+        </div>
+        <button class="pet-modal-close" id="petModalClose" type="button" aria-label="关闭宠物详情">×</button>
+      </div>
+      <p class="pet-modal-copy" id="petModalCopy">每一次完整专注，都会把它推向下一个形态。</p>
+      <div class="evolution-preview-grid" id="evolutionPreviewGrid" aria-label="宠物进化阶段预览"></div>
+    </div>
+  </div>
+
+  <div class="task-toast" id="taskToast" aria-hidden="true">
+    <span id="taskToastText">已完成任务</span>
+    <button id="taskToastUndo" type="button">撤销</button>
+  </div>
 
   <script src="script.js"></script>
 </body>
