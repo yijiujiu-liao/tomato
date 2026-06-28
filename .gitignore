@@ -1,0 +1,5 @@
+node_modules/
+.env
+data/
+promo-video/
+promo-video/renders/work-*/

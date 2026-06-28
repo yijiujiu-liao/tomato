@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: kaoyan-pomodoro
+    runtime: node
+    plan: starter
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    disk:
+      name: tomato-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_PATH
+        value: /var/data/tomato.sqlite
+      - key: SESSION_TTL_DAYS
+        value: 30

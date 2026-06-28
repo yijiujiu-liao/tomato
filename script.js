@@ -11,6 +11,8 @@ const MODES = {
 
 const STORAGE_KEY = "kaoyanPomodoroData";
 const DAILY_PLANS_KEY = "kaoyanDailyPlans";
+const AUTH_SESSION_KEY = "kaoyanPomodoroAuth";
+const STUDY_GOALS_KEY = "kaoyanStudyGoals";
 const DEFAULT_GOAL = 8;
 const DEFAULT_FOCUS_MINUTES = 50;
 const MIN_FOCUS_MINUTES = 1;
@@ -18,6 +20,11 @@ const MAX_FOCUS_MINUTES = 180;
 const REST_DURATIONS = {
   short: 5,
   long: 10
+};
+const STATS_RANGES = {
+  day: "今日",
+  week: "本周",
+  month: "本月"
 };
 
 const PET_TYPES = {
@@ -72,6 +79,7 @@ const pageButtons = document.querySelectorAll(".nav-btn");
 const appPages = document.querySelectorAll(".app-page");
 const focusDurationInput = document.querySelector("#focusDurationInput");
 const currentTaskSelect = document.querySelector("#currentTaskSelect");
+let currentGoalSelect = null;
 const todayDateText = document.querySelector("#todayDateText");
 const planProgressText = document.querySelector("#planProgressText");
 const carryOverBanner = document.querySelector("#carryOverBanner");
@@ -111,6 +119,22 @@ const evolutionPreviewGrid = document.querySelector("#evolutionPreviewGrid");
 const restTypeLabel = document.querySelector("#restTypeLabel");
 const restCopy = document.querySelector("#restCopy");
 
+let authSession = loadAuthSession();
+let authPanel = null;
+let authForm = null;
+let authMode = "login";
+let syncStatus = null;
+let manualSyncButton = null;
+let lastSyncText = null;
+let cloudStatsPanel = null;
+let studyGoalsPanel = null;
+let cloudStats = {
+  range: "week",
+  status: "idle",
+  data: null,
+  error: ""
+};
+
 let currentMode = "focus";
 let remainingSeconds = MODES.focus.minutes * 60;
 let timerId = null;
@@ -122,6 +146,7 @@ let recentlyCompletedTaskId = "";
 
 let todayData = loadTodayData();
 let dailyPlans = loadDailyPlans();
+let studyGoals = loadStudyGoals();
 
 MODES.focus.minutes = todayData.focusDuration;
 MODES.rest.minutes = getRestMinutes();
@@ -131,6 +156,12 @@ goalInput.value = todayData.dailyGoal;
 applyTheme(todayData.theme);
 render();
 switchPage("timer");
+setupAuthUI();
+setupCloudStatsUI();
+setupStudyGoalsUI();
+setupCurrentGoalUI();
+refreshAuthUI();
+bootstrapCloudSession();
 
 startBtn.addEventListener("click", startTimer);
 pauseBtn.addEventListener("click", pauseTimer);
@@ -175,6 +206,1112 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("sw.js");
   });
+}
+
+function setupAuthUI() {
+  const hero = document.querySelector(".hero");
+
+  if (!hero) {
+    return;
+  }
+
+  authPanel = document.createElement("section");
+  authPanel.className = "account-panel";
+  authPanel.innerHTML = `
+    <div class="account-summary">
+      <div>
+        <span class="account-kicker">云端同步</span>
+        <strong id="accountName">本地模式</strong>
+      </div>
+      <button class="text-btn account-toggle" id="accountToggle" type="button">登录</button>
+    </div>
+    <form class="account-form" id="accountForm" hidden>
+      <div class="account-field-row">
+        <input id="authEmailInput" type="email" autocomplete="email" placeholder="邮箱">
+        <input id="authPasswordInput" type="password" autocomplete="current-password" placeholder="密码">
+      </div>
+      <input id="authNameInput" type="text" autocomplete="nickname" placeholder="昵称（注册时填写）" hidden>
+      <div class="account-actions">
+        <button class="primary-btn account-submit" id="authSubmitBtn" type="submit">登录</button>
+        <button class="text-btn" id="authModeBtn" type="button">注册账号</button>
+      </div>
+      <p class="sync-status" id="syncStatus" role="status"></p>
+    </form>
+    <div class="account-sync-tools" id="accountSyncTools" hidden>
+      <button class="text-btn manual-sync-btn" id="manualSyncBtn" type="button">立即同步</button>
+      <span id="lastSyncText">尚未同步</span>
+    </div>
+  `;
+
+  hero.appendChild(authPanel);
+  authForm = authPanel.querySelector("#accountForm");
+  syncStatus = authPanel.querySelector("#syncStatus");
+  manualSyncButton = authPanel.querySelector("#manualSyncBtn");
+  lastSyncText = authPanel.querySelector("#lastSyncText");
+
+  authPanel.querySelector("#accountToggle").addEventListener("click", handleAccountToggle);
+  authPanel.querySelector("#authModeBtn").addEventListener("click", toggleAuthMode);
+  manualSyncButton.addEventListener("click", () => {
+    performFullCloudSync("正在手动同步...").catch((error) => setSyncStatus(error.message, true));
+  });
+  authForm.addEventListener("submit", handleAuthSubmit);
+}
+
+function refreshAuthUI() {
+  if (!authPanel) {
+    return;
+  }
+
+  const accountName = authPanel.querySelector("#accountName");
+  const accountToggle = authPanel.querySelector("#accountToggle");
+  const authSubmitBtn = authPanel.querySelector("#authSubmitBtn");
+  const authModeBtn = authPanel.querySelector("#authModeBtn");
+  const authNameInput = authPanel.querySelector("#authNameInput");
+  const syncTools = authPanel.querySelector("#accountSyncTools");
+
+  if (authSession?.user) {
+    accountName.textContent = authSession.user.displayName || authSession.user.email;
+    accountToggle.textContent = "退出";
+    authForm.hidden = true;
+    syncTools.hidden = false;
+    updateLastSyncText();
+    setSyncStatus("已开启云端同步");
+    renderCloudStats();
+    return;
+  }
+
+  accountName.textContent = "本地模式";
+  accountToggle.textContent = authForm?.hidden ? "登录" : "收起";
+  syncTools.hidden = true;
+  authSubmitBtn.textContent = authMode === "register" ? "注册并同步" : "登录";
+  authModeBtn.textContent = authMode === "register" ? "已有账号，去登录" : "注册账号";
+  authNameInput.hidden = authMode !== "register";
+  renderCloudStats();
+}
+
+function handleAccountToggle() {
+  if (authSession?.token) {
+    logoutFromCloud();
+    return;
+  }
+
+  authForm.hidden = !authForm.hidden;
+  refreshAuthUI();
+}
+
+function toggleAuthMode() {
+  authMode = authMode === "login" ? "register" : "login";
+  refreshAuthUI();
+}
+
+async function handleAuthSubmit(event) {
+  event.preventDefault();
+
+  const email = authPanel.querySelector("#authEmailInput").value.trim();
+  const password = authPanel.querySelector("#authPasswordInput").value;
+  const displayName = authPanel.querySelector("#authNameInput").value.trim();
+
+  if (!email || password.length < 8) {
+    setSyncStatus("请输入邮箱和至少 8 位密码", true);
+    return;
+  }
+
+  try {
+    setSyncStatus(authMode === "register" ? "正在注册..." : "正在登录...");
+    const result = await apiRequest(`/api/auth/${authMode === "register" ? "register" : "login"}`, {
+      method: "POST",
+      body: {
+        email,
+        password,
+        displayName
+      },
+      skipAuth: true
+    });
+
+    authSession = result;
+    saveAuthSession();
+    await performFullCloudSync("正在同步本地与云端...");
+  } catch (error) {
+    setSyncStatus(error.message, true);
+  }
+}
+
+async function logoutFromCloud() {
+  try {
+    if (authSession?.token) {
+      await apiRequest("/api/auth/logout", { method: "POST" });
+    }
+  } catch (error) {
+    console.warn(error);
+  }
+
+  authSession = null;
+  saveAuthSession();
+  refreshAuthUI();
+  cloudStats = {
+    range: cloudStats.range,
+    status: "idle",
+    data: null,
+    error: ""
+  };
+  renderCloudStats();
+  setSyncStatus("已回到本地模式");
+}
+
+async function bootstrapCloudSession() {
+  if (!authSession?.token) {
+    return;
+  }
+
+  try {
+    await performFullCloudSync("正在恢复云端同步...");
+  } catch (error) {
+    setSyncStatus("登录已过期，请重新登录", true);
+    authSession = null;
+    saveAuthSession();
+    refreshAuthUI();
+  }
+}
+
+function loadAuthSession() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(AUTH_SESSION_KEY));
+
+    if (!saved?.session?.token || !saved?.user) {
+      return null;
+    }
+
+    return {
+      user: saved.user,
+      token: saved.session.token,
+      expiresAt: saved.session.expiresAt,
+      lastSyncedAt: typeof saved.lastSyncedAt === "string" ? saved.lastSyncedAt : ""
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+function saveAuthSession() {
+  if (!authSession) {
+    localStorage.removeItem(AUTH_SESSION_KEY);
+    return;
+  }
+
+  localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify({
+    user: authSession.user,
+    lastSyncedAt: authSession.lastSyncedAt || "",
+    session: {
+      token: authSession.token || authSession.session?.token,
+      expiresAt: authSession.expiresAt || authSession.session?.expiresAt
+    }
+  }));
+
+  if (authSession.session) {
+    authSession = {
+      user: authSession.user,
+      token: authSession.session.token,
+      expiresAt: authSession.session.expiresAt,
+      lastSyncedAt: authSession.lastSyncedAt || ""
+    };
+  }
+}
+
+async function apiRequest(path, options = {}) {
+  const headers = {
+    "Content-Type": "application/json",
+    ...(options.headers || {})
+  };
+
+  if (!options.skipAuth && authSession?.token) {
+    headers.Authorization = `Bearer ${authSession.token}`;
+  }
+
+  const response = await fetch(path, {
+    method: options.method || "GET",
+    headers,
+    body: options.body ? JSON.stringify(options.body) : undefined
+  });
+
+  if (!response.ok) {
+    let message = "请求失败";
+
+    try {
+      const payload = await response.json();
+      message = payload.error || message;
+    } catch (error) {
+      message = response.statusText || message;
+    }
+
+    throw new Error(message);
+  }
+
+  if (response.status === 204) {
+    return null;
+  }
+
+  return response.json();
+}
+
+function isCloudSyncEnabled() {
+  return Boolean(authSession?.token);
+}
+
+function setSyncStatus(message, isError = false) {
+  if (!syncStatus) {
+    return;
+  }
+
+  syncStatus.textContent = message || "";
+  syncStatus.dataset.error = String(isError);
+}
+
+async function performFullCloudSync(message = "正在同步...") {
+  if (!isCloudSyncEnabled()) {
+    return;
+  }
+
+  try {
+    if (manualSyncButton) {
+      manualSyncButton.disabled = true;
+    }
+
+    setSyncStatus(message);
+    await syncLocalStateToCloud();
+    await pullCloudState();
+    await fetchCloudStats(cloudStats.range, { silent: true });
+    markCloudSynced();
+    refreshAuthUI();
+    setSyncStatus("同步完成");
+  } finally {
+    if (manualSyncButton) {
+      manualSyncButton.disabled = false;
+    }
+  }
+}
+
+function markCloudSynced() {
+  if (!authSession) {
+    return;
+  }
+
+  authSession.lastSyncedAt = new Date().toISOString();
+  saveAuthSession();
+  updateLastSyncText();
+}
+
+function updateLastSyncText() {
+  if (!lastSyncText) {
+    return;
+  }
+
+  lastSyncText.textContent = authSession?.lastSyncedAt
+    ? `上次同步 ${formatLastSyncTime(authSession.lastSyncedAt)}`
+    : "尚未同步";
+}
+
+function formatLastSyncTime(value) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "未知";
+  }
+
+  return date.toLocaleString("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function setupCloudStatsUI() {
+  const statsPage = document.querySelector('.app-page[data-page="stats"]');
+
+  if (!statsPage) {
+    return;
+  }
+
+  cloudStatsPanel = document.createElement("section");
+  cloudStatsPanel.className = "card cloud-stats-card";
+  cloudStatsPanel.innerHTML = `
+    <div class="section-title cloud-stats-head">
+      <div>
+        <p class="stats-kicker">长期复习节奏</p>
+        <h2>云端学习统计</h2>
+      </div>
+      <div class="stats-range-tabs" role="tablist" aria-label="统计范围">
+        <button class="stats-range-btn" type="button" data-stats-range="day">今日</button>
+        <button class="stats-range-btn" type="button" data-stats-range="week">本周</button>
+        <button class="stats-range-btn" type="button" data-stats-range="month">本月</button>
+      </div>
+    </div>
+    <p class="stats-sync-hint" id="statsSyncHint"></p>
+    <div class="cloud-stats-summary" id="cloudStatsSummary"></div>
+    <div class="cloud-stats-chart" id="cloudStatsChart" aria-label="学习趋势图"></div>
+    <div class="stats-heatmap-wrap">
+      <div class="stats-heatmap-head">
+        <strong>近 30 天稳定度</strong>
+        <span id="statsHeatmapCaption">登录后生成学习热力图</span>
+      </div>
+      <div class="stats-heatmap" id="statsHeatmap" aria-label="近 30 天学习热力图"></div>
+    </div>
+  `;
+
+  statsPage.appendChild(cloudStatsPanel);
+  cloudStatsPanel.querySelectorAll("[data-stats-range]").forEach((button) => {
+    button.addEventListener("click", () => fetchCloudStats(button.dataset.statsRange));
+  });
+  renderCloudStats();
+}
+
+async function fetchCloudStats(range = cloudStats.range, options = {}) {
+  cloudStats.range = STATS_RANGES[range] ? range : "week";
+
+  if (!isCloudSyncEnabled()) {
+    cloudStats.status = "idle";
+    cloudStats.data = null;
+    cloudStats.error = "";
+    renderCloudStats();
+    return;
+  }
+
+  try {
+    cloudStats.status = options.silent ? cloudStats.status : "loading";
+    cloudStats.error = "";
+    renderCloudStats();
+
+    const data = await apiRequest(`/api/stats?range=${cloudStats.range}`);
+    cloudStats = {
+      range: cloudStats.range,
+      status: "ready",
+      data,
+      error: ""
+    };
+  } catch (error) {
+    cloudStats = {
+      range: cloudStats.range,
+      status: "error",
+      data: cloudStats.data,
+      error: error.message
+    };
+  }
+
+  renderCloudStats();
+}
+
+function renderCloudStats() {
+  if (!cloudStatsPanel) {
+    return;
+  }
+
+  cloudStatsPanel.querySelectorAll("[data-stats-range]").forEach((button) => {
+    const isActive = button.dataset.statsRange === cloudStats.range;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-selected", String(isActive));
+  });
+
+  const hint = cloudStatsPanel.querySelector("#statsSyncHint");
+  const summary = cloudStatsPanel.querySelector("#cloudStatsSummary");
+  const chart = cloudStatsPanel.querySelector("#cloudStatsChart");
+  const heatmap = cloudStatsPanel.querySelector("#statsHeatmap");
+  const heatmapCaption = cloudStatsPanel.querySelector("#statsHeatmapCaption");
+
+  if (!isCloudSyncEnabled()) {
+    hint.textContent = "登录后可查看跨设备累计的每日、每周、每月学习统计。";
+    summary.innerHTML = buildLocalStatsSummary();
+    chart.innerHTML = `<p class="cloud-stats-empty">当前是本地模式，先完成登录/注册，就能把专注记录沉淀成长期曲线。</p>`;
+    heatmapCaption.textContent = "本地模式暂不生成跨设备热力图";
+    renderCloudStatsHeatmap(heatmap, []);
+    return;
+  }
+
+  if (cloudStats.status === "loading") {
+    hint.textContent = `正在读取${STATS_RANGES[cloudStats.range]}学习数据...`;
+  } else if (cloudStats.status === "error") {
+    hint.textContent = cloudStats.error || "统计数据暂时读取失败。";
+  } else {
+    hint.textContent = `${STATS_RANGES[cloudStats.range]}统计来自云端专注记录，会随多设备同步自动更新。`;
+  }
+
+  const totals = cloudStats.data?.totals || {
+    completedCount: 0,
+    focusMinutes: 0,
+    xpEarned: 0
+  };
+  const rhythmSummary = cloudStats.data?.summary || {
+    activeDays: 0,
+    averageDailyMinutes: 0,
+    currentStreakDays: 0,
+    bestDay: null
+  };
+
+  if (cloudStats.status === "ready" && rhythmSummary.bestDay) {
+    hint.textContent = `${STATS_RANGES[cloudStats.range]}最高效的一天是 ${formatStatsDateLabel(rhythmSummary.bestDay.date)}，学习了 ${rhythmSummary.bestDay.focusMinutes} 分钟。`;
+  }
+
+  summary.innerHTML = `
+    ${renderCloudStatMetric(totals.focusMinutes, "专注分钟")}
+    ${renderCloudStatMetric(rhythmSummary.activeDays, "学习天数")}
+    ${renderCloudStatMetric(rhythmSummary.averageDailyMinutes, "日均分钟")}
+    ${renderCloudStatMetric(rhythmSummary.currentStreakDays, "连续天数")}
+  `;
+
+  renderCloudStatsChart(chart, cloudStats.data?.days || []);
+  renderCloudStatsHeatmap(heatmap, cloudStats.data?.days || []);
+  heatmapCaption.textContent = buildHeatmapCaption(cloudStats.data?.summary);
+}
+
+function buildLocalStatsSummary() {
+  return `
+    ${renderCloudStatMetric(todayData.completedCount, "今日次数")}
+    ${renderCloudStatMetric(todayData.focusMinutes, "今日分钟")}
+    ${renderCloudStatMetric(todayData.petProgress.totalXP, "宠物 XP")}
+    ${renderCloudStatMetric(todayData.dailyGoal, "今日目标")}
+  `;
+}
+
+function renderCloudStatMetric(value, label) {
+  return `
+    <article class="cloud-stat-metric">
+      <strong>${Number(value) || 0}</strong>
+      <span>${label}</span>
+    </article>
+  `;
+}
+
+function renderCloudStatsChart(container, days) {
+  container.innerHTML = "";
+
+  if (!Array.isArray(days) || days.length === 0) {
+    container.innerHTML = `<p class="cloud-stats-empty">这个范围还没有云端专注记录。完成一个番茄后，这里会长出第一根柱子。</p>`;
+    return;
+  }
+
+  const maxMinutes = Math.max(...days.map((day) => Number(day.focusMinutes) || 0), 1);
+
+  days.forEach((day) => {
+    const minutes = Number(day.focusMinutes) || 0;
+    const bar = document.createElement("div");
+    bar.className = "cloud-stat-bar";
+    bar.title = `${formatStatsDateLabel(day.date)}：${minutes} 分钟，${Number(day.completedCount) || 0} 次专注，${Number(day.xpEarned) || 0} XP`;
+    bar.style.setProperty("--bar-height", `${Math.max(8, Math.round((minutes / maxMinutes) * 100))}%`);
+    bar.innerHTML = `
+      <span class="cloud-stat-bar-fill"></span>
+      <strong>${minutes}</strong>
+      <small>${formatStatsDateLabel(day.date)}</small>
+    `;
+    container.appendChild(bar);
+  });
+}
+
+function renderCloudStatsHeatmap(container, days) {
+  container.innerHTML = "";
+
+  if (!Array.isArray(days) || days.length === 0) {
+    container.innerHTML = `<p class="cloud-stats-empty">还没有足够的数据生成热力图。</p>`;
+    return;
+  }
+
+  const maxMinutes = Math.max(...days.map((day) => Number(day.focusMinutes) || 0), 1);
+
+  days.slice(-30).forEach((day) => {
+    const minutes = Number(day.focusMinutes) || 0;
+    const level = minutes === 0 ? 0 : Math.max(1, Math.ceil((minutes / maxMinutes) * 4));
+    const cell = document.createElement("span");
+    cell.className = "stats-heat-cell";
+    cell.dataset.level = String(level);
+    cell.title = `${formatStatsDateLabel(day.date)}：${minutes} 分钟`;
+    cell.textContent = new Date(day.date).getDate();
+    container.appendChild(cell);
+  });
+}
+
+function buildHeatmapCaption(summary) {
+  if (!summary || summary.activeDays === 0) {
+    return "这个范围还没有形成学习节奏";
+  }
+
+  return `${summary.activeDays} 天有学习记录，当前连续 ${summary.currentStreakDays} 天`;
+}
+
+function formatStatsDateLabel(value) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value || "";
+  }
+
+  return `${date.getMonth() + 1}/${date.getDate()}`;
+}
+
+function setupStudyGoalsUI() {
+  const statsPage = document.querySelector('.app-page[data-page="stats"]');
+
+  if (!statsPage) {
+    return;
+  }
+
+  studyGoalsPanel = document.createElement("section");
+  studyGoalsPanel.className = "card study-goals-card";
+  studyGoalsPanel.innerHTML = `
+    <div class="section-title study-goals-head">
+      <div>
+        <p class="stats-kicker">考研长期目标</p>
+        <h2>学习目标</h2>
+      </div>
+      <span class="study-goals-count" id="studyGoalsCount">0 个进行中</span>
+    </div>
+    <form class="study-goal-form" id="studyGoalForm">
+      <input id="studyGoalTitle" type="text" maxlength="80" placeholder="例如：英语真题二刷、政治一轮背完">
+      <input id="studyGoalMinutes" type="number" min="0" max="99999" step="30" inputmode="numeric" placeholder="目标分钟">
+      <input id="studyGoalDate" type="date" aria-label="目标日期">
+      <button class="primary-btn study-goal-submit" type="submit">添加目标</button>
+    </form>
+    <ul class="study-goal-list" id="studyGoalList"></ul>
+  `;
+
+  const cloudStatsCard = statsPage.querySelector(".cloud-stats-card");
+  statsPage.insertBefore(studyGoalsPanel, cloudStatsCard || null);
+  studyGoalsPanel.querySelector("#studyGoalForm").addEventListener("submit", handleStudyGoalSubmit);
+  renderStudyGoals();
+}
+
+function handleStudyGoalSubmit(event) {
+  event.preventDefault();
+
+  const titleInput = studyGoalsPanel.querySelector("#studyGoalTitle");
+  const minutesInput = studyGoalsPanel.querySelector("#studyGoalMinutes");
+  const dateInput = studyGoalsPanel.querySelector("#studyGoalDate");
+  const title = titleInput.value.trim();
+
+  if (!title) {
+    titleInput.focus();
+    return;
+  }
+
+  addStudyGoal({
+    title,
+    targetMinutes: normalizeNonNegativeInteger(minutesInput.value),
+    targetDate: dateInput.value || null
+  });
+  titleInput.value = "";
+  minutesInput.value = "";
+  dateInput.value = "";
+  titleInput.focus();
+}
+
+function addStudyGoal(goalInput) {
+  const goal = normalizeStudyGoal({
+    id: createStudyGoalId(),
+    clientId: "",
+    title: goalInput.title,
+    targetMinutes: goalInput.targetMinutes,
+    targetDate: goalInput.targetDate,
+    completed: false,
+    createdAt: new Date().toISOString(),
+    completedAt: null,
+    updatedAt: new Date().toISOString()
+  });
+
+  if (!goal) {
+    return;
+  }
+
+  studyGoals.unshift(goal);
+  saveStudyGoals();
+  renderStudyGoals();
+  runCloudSync(async () => {
+    const created = await createStudyGoalInCloud(goal);
+    replaceStudyGoal(goal.id, normalizeStudyGoal(created.studyGoal));
+  });
+}
+
+function toggleStudyGoal(goalId) {
+  const goal = studyGoals.find((item) => item.id === goalId);
+
+  if (!goal) {
+    return;
+  }
+
+  goal.completed = !goal.completed;
+  goal.completedAt = goal.completed ? new Date().toISOString() : null;
+  goal.updatedAt = new Date().toISOString();
+  saveStudyGoals();
+  renderStudyGoals();
+  runCloudSync(async () => {
+    if (!goal.syncedGoalId) {
+      const created = await createStudyGoalInCloud(goal);
+      replaceStudyGoal(goal.id, normalizeStudyGoal(created.studyGoal));
+      return;
+    }
+
+    const updated = await apiRequest(`/api/study-goals/${goal.syncedGoalId}`, {
+      method: "PATCH",
+      body: {
+        completed: goal.completed
+      }
+    });
+    replaceStudyGoal(goal.id, normalizeStudyGoal(updated.studyGoal));
+  });
+}
+
+function deleteStudyGoal(goalId) {
+  const goal = studyGoals.find((item) => item.id === goalId);
+
+  if (!goal) {
+    return;
+  }
+
+  studyGoals = studyGoals.filter((item) => item.id !== goalId);
+
+  if (todayData.currentStudyGoalId === goalId) {
+    todayData.currentStudyGoalId = "";
+    saveTodayData();
+  }
+
+  saveStudyGoals();
+  renderStudyGoals();
+  updateCurrentGoalOptions();
+
+  if (goal.syncedGoalId) {
+    runCloudSync(() => apiRequest(`/api/study-goals/${goal.syncedGoalId}`, {
+      method: "DELETE"
+    }));
+  }
+}
+
+function renderStudyGoals() {
+  if (!studyGoalsPanel) {
+    return;
+  }
+
+  const list = studyGoalsPanel.querySelector("#studyGoalList");
+  const count = studyGoalsPanel.querySelector("#studyGoalsCount");
+  const activeCount = studyGoals.filter((goal) => !goal.completed).length;
+  count.textContent = `${activeCount} 个进行中`;
+  list.innerHTML = "";
+
+  if (studyGoals.length === 0) {
+    const emptyItem = document.createElement("li");
+    emptyItem.className = "study-goal-empty";
+    emptyItem.textContent = "先写下一个长期目标，让每天的番茄钟有方向。";
+    list.appendChild(emptyItem);
+    return;
+  }
+
+  studyGoals.forEach((goal) => {
+    const item = document.createElement("li");
+    item.className = "study-goal-item";
+    item.dataset.completed = String(goal.completed);
+    item.innerHTML = `
+      <button class="study-goal-check" type="button" aria-label="${goal.completed ? "恢复目标" : "完成目标"}">
+        ${goal.completed ? "✓" : ""}
+      </button>
+      <div class="study-goal-main">
+        <strong>${escapeHtml(goal.title)}</strong>
+        <span>${formatStudyGoalMeta(goal)}</span>
+        <div class="study-goal-progress" aria-label="目标进度">
+          <i style="width: ${Math.min(100, Number(goal.progressPercent) || 0)}%"></i>
+        </div>
+      </div>
+      <button class="text-btn study-goal-delete" type="button">删除</button>
+    `;
+    item.querySelector(".study-goal-check").addEventListener("click", () => toggleStudyGoal(goal.id));
+    item.querySelector(".study-goal-delete").addEventListener("click", () => deleteStudyGoal(goal.id));
+    list.appendChild(item);
+  });
+}
+
+function formatStudyGoalMeta(goal) {
+  const parts = [];
+
+  if (goal.targetMinutes > 0) {
+    parts.push(`${goal.focusMinutes || 0} / ${goal.targetMinutes} 分钟`);
+  }
+
+  if (goal.targetDate) {
+    parts.push(`截止 ${goal.targetDate}`);
+  }
+
+  if (goal.completed) {
+    parts.push("已完成");
+  }
+
+  return parts.length ? parts.join(" · ") : "不设时长，保持推进";
+}
+
+function setupCurrentGoalUI() {
+  const currentTaskSetting = document.querySelector(".current-task-setting");
+
+  if (!currentTaskSetting) {
+    return;
+  }
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "current-goal-setting";
+  wrapper.innerHTML = `
+    <label for="currentGoalSelect">当前目标</label>
+    <select id="currentGoalSelect" aria-label="选择当前学习目标"></select>
+  `;
+  currentTaskSetting.insertAdjacentElement("afterend", wrapper);
+  currentGoalSelect = wrapper.querySelector("#currentGoalSelect");
+  currentGoalSelect.addEventListener("change", updateCurrentGoalSelection);
+  updateCurrentGoalOptions();
+}
+
+async function pullCloudState() {
+  const data = await apiRequest("/api/sync");
+
+  if (data.user) {
+    authSession.user = data.user;
+    saveAuthSession();
+  }
+
+  applyCloudSettings(data.settings);
+  applyCloudPet(data.pet);
+  applyCloudTasks(data.tasks || []);
+  applyCloudStudyGoals(data.studyGoals || []);
+  applyCloudFocusSessions(data.focusSessions || []);
+  render();
+}
+
+async function syncLocalStateToCloud() {
+  if (!isCloudSyncEnabled()) {
+    return;
+  }
+
+  await uploadLocalStudyGoalsToCloud();
+  await syncSettingsToCloud();
+  await syncPetToCloud();
+  await uploadLocalFocusRecordsToCloud();
+  await uploadLocalTasksToCloud();
+}
+
+async function uploadLocalFocusRecordsToCloud() {
+  if (!Array.isArray(todayData.records) || todayData.records.length === 0) {
+    return;
+  }
+
+  for (const record of todayData.records) {
+    if (record.syncedSessionId) {
+      continue;
+    }
+
+    const created = await apiRequest("/api/focus-sessions", {
+      method: "POST",
+      body: {
+        clientId: record.id || createFocusRecordId(),
+        taskId: record.taskId || null,
+        studyGoalId: record.studyGoalId || null,
+        taskTitle: record.task,
+        minutes: record.minutes,
+        startedAt: record.startedAt,
+        endedAt: record.endedAt,
+        streak: record.streak,
+        xpEarned: record.xpEarned || record.minutes
+      }
+    });
+
+    record.id = created.focusSession.clientId || record.id || created.focusSession.id;
+    record.syncedSessionId = created.focusSession.id;
+  }
+
+  saveTodayData(false);
+}
+
+async function uploadLocalStudyGoalsToCloud() {
+  if (!Array.isArray(studyGoals) || studyGoals.length === 0) {
+    return;
+  }
+
+  for (const goal of studyGoals) {
+    if (goal.syncedGoalId) {
+      continue;
+    }
+
+    const created = await createStudyGoalInCloud(goal);
+    replaceStudyGoal(goal.id, normalizeStudyGoal(created.studyGoal));
+  }
+}
+
+async function createStudyGoalInCloud(goal) {
+  return apiRequest("/api/study-goals", {
+    method: "POST",
+    body: {
+      clientId: goal.clientId || goal.id,
+      title: goal.title,
+      targetMinutes: goal.targetMinutes,
+      targetDate: goal.targetDate,
+      completed: goal.completed
+    }
+  });
+}
+
+async function syncSettingsToCloud() {
+  if (!isCloudSyncEnabled()) {
+    return;
+  }
+
+  await apiRequest("/api/settings", {
+    method: "PUT",
+    body: {
+      focusDuration: todayData.focusDuration,
+      dailyGoal: todayData.dailyGoal,
+      theme: todayData.theme,
+      nextRestType: todayData.nextRestType,
+      currentTaskId: todayData.currentTaskId,
+      currentStudyGoalId: todayData.currentStudyGoalId
+    }
+  });
+}
+
+async function syncPetToCloud() {
+  if (!isCloudSyncEnabled()) {
+    return;
+  }
+
+  await apiRequest("/api/pet", {
+    method: "PUT",
+    body: {
+      petId: todayData.petProgress.petId || todayData.selectedPet,
+      level: todayData.petProgress.level,
+      currentXP: todayData.petProgress.currentXP,
+      totalXP: todayData.petProgress.totalXP
+    }
+  });
+}
+
+async function uploadLocalTasksToCloud() {
+  const groupedTasks = Object.entries(dailyPlans);
+
+  for (const [dateKey, tasks] of groupedTasks) {
+    for (const task of tasks) {
+      if (task.syncedTaskId) {
+        continue;
+      }
+
+      const created = await createTaskInCloud(task, dateKey);
+      applyCreatedCloudTask(task, created.task);
+    }
+  }
+
+  saveDailyPlans();
+}
+
+async function createTaskInCloud(task, dateKey = getTodayKey()) {
+  return apiRequest("/api/tasks", {
+    method: "POST",
+    body: {
+      clientId: task.clientId || task.id,
+      title: task.title,
+      dateKey,
+      completed: task.completed,
+      carriedFromId: task.carriedFromId || null
+    }
+  });
+}
+
+function applyCreatedCloudTask(localTask, cloudTask) {
+  const previousId = localTask.id;
+  const normalizedTask = normalizeTask({
+    ...cloudTask,
+    clientId: cloudTask.clientId || localTask.clientId || localTask.id,
+    syncedTaskId: cloudTask.id
+  });
+
+  if (!normalizedTask) {
+    return;
+  }
+
+  Object.assign(localTask, normalizedTask);
+
+  if (todayData.currentTaskId === previousId) {
+    todayData.currentTaskId = normalizedTask.id;
+    todayData.currentTask = normalizedTask.title;
+    saveTodayData(false);
+  }
+}
+
+async function syncTaskPatch(task, patchBody, dateKey = getTodayKey()) {
+  if (!task.syncedTaskId) {
+    const created = await createTaskInCloud(task, dateKey);
+    applyCreatedCloudTask(task, created.task);
+  }
+
+  const updated = await apiRequest(`/api/tasks/${task.syncedTaskId || task.id}`, {
+    method: "PATCH",
+    body: patchBody
+  });
+  applyCreatedCloudTask(task, updated.task);
+  saveDailyPlans();
+}
+
+function applyCloudSettings(settings) {
+  if (!settings) {
+    return;
+  }
+
+  todayData.focusDuration = normalizeFocusDuration(settings.focusDuration);
+  todayData.dailyGoal = normalizeGoal(settings.dailyGoal);
+  todayData.theme = settings.theme === "dark" ? "dark" : "light";
+  todayData.nextRestType = normalizeRestType(settings.nextRestType);
+  todayData.currentTaskId = typeof settings.currentTaskId === "string" ? settings.currentTaskId : "";
+  todayData.currentStudyGoalId = typeof settings.currentStudyGoalId === "string" ? settings.currentStudyGoalId : "";
+  MODES.focus.minutes = todayData.focusDuration;
+  MODES.rest.minutes = getRestMinutes();
+
+  if (currentMode === "focus" && timerId === null) {
+    remainingSeconds = MODES.focus.minutes * 60;
+  }
+
+  focusDurationInput.value = todayData.focusDuration;
+  goalInput.value = todayData.dailyGoal;
+  applyTheme(todayData.theme);
+  saveTodayData(false);
+}
+
+function applyCloudPet(pet) {
+  if (!pet) {
+    return;
+  }
+
+  const petId = normalizePetType(pet.petId);
+  todayData.selectedPet = petId;
+  todayData.petProgress = normalizePetProgress({
+    petId,
+    level: pet.level,
+    currentXP: pet.currentXP,
+    totalXP: pet.totalXP,
+    lastUpdated: pet.updatedAt
+  }, petId);
+  saveTodayData(false);
+}
+
+function applyCloudTasks(tasks) {
+  if (!Array.isArray(tasks)) {
+    return;
+  }
+
+  const cloudPlans = tasks.reduce((plans, task) => {
+    const dateKey = task.dateKey || getTodayKey();
+
+    if (!plans[dateKey]) {
+      plans[dateKey] = [];
+    }
+
+    plans[dateKey].push(normalizeTask({
+      id: task.id,
+      clientId: task.clientId,
+      syncedTaskId: task.id,
+      title: task.title,
+      completed: task.completed,
+      createdAt: task.createdAt,
+      completedAt: task.completedAt,
+      carriedFromId: task.carriedFromId
+    }));
+
+    return plans;
+  }, {});
+  const cloudKeys = new Set(tasks.map((task) => task.clientId || task.id));
+
+  Object.entries(dailyPlans).forEach(([dateKey, localTasks]) => {
+    const unsyncedTasks = localTasks.filter((task) => {
+      return !task.syncedTaskId && !cloudKeys.has(task.clientId || task.id);
+    });
+
+    if (unsyncedTasks.length === 0) {
+      return;
+    }
+
+    if (!cloudPlans[dateKey]) {
+      cloudPlans[dateKey] = [];
+    }
+
+    cloudPlans[dateKey].push(...unsyncedTasks);
+  });
+
+  dailyPlans = cloudPlans;
+  saveDailyPlans(false);
+}
+
+function applyCloudStudyGoals(goals) {
+  if (!Array.isArray(goals)) {
+    return;
+  }
+
+  const localUnsyncedGoals = studyGoals.filter((goal) => !goal.syncedGoalId);
+  const cloudGoals = goals.map(normalizeStudyGoal).filter(Boolean);
+  const cloudKeys = new Set(cloudGoals.map((goal) => goal.clientId || goal.id));
+  studyGoals = [
+    ...cloudGoals,
+    ...localUnsyncedGoals.filter((goal) => !cloudKeys.has(goal.clientId || goal.id))
+  ].sort(sortStudyGoals);
+  saveStudyGoals();
+  renderStudyGoals();
+}
+
+function applyCloudFocusSessions(focusSessions) {
+  if (!Array.isArray(focusSessions)) {
+    return;
+  }
+
+  const todayKey = getTodayKey();
+  const cloudRecords = focusSessions
+    .filter((session) => session.mode === "focus" && getDateKey(new Date(session.endedAt)) === todayKey)
+    .map(focusSessionToRecord);
+  const cloudRecordKeys = new Set(cloudRecords.map(getFocusRecordKey));
+  const localUnsyncedRecords = todayData.records
+    .filter((record) => !record.syncedSessionId && getDateKey(new Date(record.endedAt)) === todayKey)
+    .filter((record) => !cloudRecordKeys.has(getFocusRecordKey(record)));
+  const records = [...cloudRecords, ...localUnsyncedRecords]
+    .filter(Boolean)
+    .sort((first, second) => new Date(second.endedAt) - new Date(first.endedAt));
+
+  todayData.records = records;
+  todayData.completedCount = records.length;
+  todayData.focusMinutes = records.reduce((total, record) => total + (Number(record.minutes) || 0), 0);
+  todayData.streak = records.reduce((maxStreak, record) => Math.max(maxStreak, Number(record.streak) || 0), 0);
+  saveTodayData(false);
+}
+
+function focusSessionToRecord(session) {
+  const endedAt = session.endedAt || new Date().toISOString();
+  const endedDate = new Date(endedAt);
+
+  return {
+    id: session.clientId || session.id,
+    syncedSessionId: session.id,
+    taskId: session.taskId || "",
+    studyGoalId: session.studyGoalId || "",
+    time: Number.isNaN(endedDate.getTime())
+      ? ""
+      : endedDate.toLocaleTimeString("zh-CN", {
+        hour: "2-digit",
+        minute: "2-digit"
+      }),
+    task: session.taskTitle || "未命名学习任务",
+    minutes: Number(session.minutes) || 0,
+    streak: Number(session.streak) || 0,
+    xpEarned: Number(session.xpEarned) || 0,
+    startedAt: session.startedAt || "",
+    endedAt
+  };
+}
+
+function getFocusRecordKey(record) {
+  return record.syncedSessionId || record.id || `${record.endedAt}-${record.task}-${record.minutes}`;
+}
+
+function runCloudSync(action) {
+  if (!isCloudSyncEnabled()) {
+    return;
+  }
+
+  Promise.resolve()
+    .then(action)
+    .then(() => setSyncStatus("已同步"))
+    .catch((error) => setSyncStatus(error.message, true));
 }
 
 function startTimer() {
@@ -310,6 +1447,83 @@ function saveDailyPlans() {
   localStorage.setItem(DAILY_PLANS_KEY, JSON.stringify(dailyPlans));
 }
 
+function loadStudyGoals() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STUDY_GOALS_KEY));
+
+    if (!Array.isArray(saved)) {
+      return [];
+    }
+
+    return saved.map(normalizeStudyGoal).filter(Boolean).sort(sortStudyGoals);
+  } catch (error) {
+    return [];
+  }
+}
+
+function saveStudyGoals() {
+  localStorage.setItem(STUDY_GOALS_KEY, JSON.stringify(studyGoals));
+}
+
+function normalizeStudyGoal(goal) {
+  if (!goal || typeof goal !== "object" || typeof goal.title !== "string" || !goal.title.trim()) {
+    return null;
+  }
+
+  const syncedGoalId = typeof goal.syncedGoalId === "string" && goal.syncedGoalId
+    ? goal.syncedGoalId
+    : (typeof goal.id === "string" && goal.clientId ? goal.id : "");
+  const clientId = typeof goal.clientId === "string" && goal.clientId
+    ? goal.clientId
+    : (syncedGoalId ? "" : (typeof goal.id === "string" ? goal.id : createStudyGoalId()));
+
+  return {
+    id: syncedGoalId || clientId || createStudyGoalId(),
+    clientId,
+    syncedGoalId,
+    title: goal.title.trim().slice(0, 80),
+    targetMinutes: normalizeNonNegativeInteger(goal.targetMinutes),
+    focusMinutes: normalizeNonNegativeInteger(goal.focusMinutes),
+    progressPercent: normalizeNonNegativeInteger(goal.progressPercent),
+    targetDate: /^\d{4}-\d{2}-\d{2}$/.test(goal.targetDate || "") ? goal.targetDate : null,
+    completed: Boolean(goal.completed),
+    createdAt: typeof goal.createdAt === "string" ? goal.createdAt : new Date().toISOString(),
+    completedAt: goal.completed && typeof goal.completedAt === "string" ? goal.completedAt : null,
+    updatedAt: typeof goal.updatedAt === "string" ? goal.updatedAt : new Date().toISOString()
+  };
+}
+
+function replaceStudyGoal(currentId, nextGoal) {
+  if (!nextGoal) {
+    return;
+  }
+
+  studyGoals = studyGoals.map((goal) => goal.id === currentId ? nextGoal : goal).sort(sortStudyGoals);
+
+  if (todayData.currentStudyGoalId === currentId) {
+    todayData.currentStudyGoalId = nextGoal.id;
+  }
+
+  todayData.records.forEach((record) => {
+    if (record.studyGoalId === currentId) {
+      record.studyGoalId = nextGoal.id;
+    }
+  });
+
+  saveTodayData(false);
+  saveStudyGoals();
+  renderStudyGoals();
+  updateCurrentGoalOptions();
+}
+
+function sortStudyGoals(first, second) {
+  if (first.completed !== second.completed) {
+    return Number(first.completed) - Number(second.completed);
+  }
+
+  return new Date(second.updatedAt) - new Date(first.updatedAt);
+}
+
 function getTodayTasks() {
   const today = getTodayKey();
 
@@ -327,17 +1541,28 @@ function addTask(title) {
     return false;
   }
 
-  getTodayTasks().push({
+  const task = {
     id: createTaskId(),
+    clientId: "",
+    syncedTaskId: "",
     title: cleanTitle,
     completed: false,
     createdAt: new Date().toISOString(),
     completedAt: null
-  });
+  };
+
+  getTodayTasks().push(task);
 
   saveDailyPlans();
   renderTaskPage();
   updateCurrentTaskOptions();
+  runCloudSync(async () => {
+    const created = await createTaskInCloud(task, getTodayKey());
+    applyCreatedCloudTask(task, created.task);
+    saveDailyPlans();
+    renderTaskPage();
+    updateCurrentTaskOptions();
+  });
   return true;
 }
 
@@ -360,6 +1585,7 @@ function toggleTask(taskId) {
   saveDailyPlans();
   renderTaskPage();
   updateCurrentTaskOptions();
+  runCloudSync(() => syncTaskPatch(task, { completed: task.completed }));
 }
 
 function editTask(taskId, newTitle) {
@@ -380,10 +1606,12 @@ function editTask(taskId, newTitle) {
   saveDailyPlans();
   renderTaskPage();
   updateCurrentTaskOptions();
+  runCloudSync(() => syncTaskPatch(task, { title: task.title }));
 }
 
 function deleteTask(taskId) {
   const tasks = getTodayTasks();
+  const task = tasks.find((item) => item.id === taskId);
   const nextTasks = tasks.filter((task) => task.id !== taskId);
 
   dailyPlans[getTodayKey()] = nextTasks;
@@ -397,6 +1625,11 @@ function deleteTask(taskId) {
   saveDailyPlans();
   renderTaskPage();
   updateCurrentTaskOptions();
+  if (task?.syncedTaskId) {
+    runCloudSync(() => apiRequest(`/api/tasks/${task.syncedTaskId}`, {
+      method: "DELETE"
+    }));
+  }
 }
 
 function getYesterdayUnfinishedTasks() {
@@ -416,20 +1649,31 @@ function carryOverYesterdayTasks() {
     return !existingKeys.has(task.id) && !existingKeys.has(task.title);
   });
 
-  tasksToCarry.forEach((task) => {
-    todayTasks.push({
+  const carriedTasks = tasksToCarry.map((task) => ({
       id: createTaskId(),
+      clientId: "",
+      syncedTaskId: "",
       title: task.title,
       completed: false,
       createdAt: new Date().toISOString(),
       completedAt: null,
       carriedFromId: task.id
-    });
-  });
+  }));
+
+  todayTasks.push(...carriedTasks);
 
   saveDailyPlans();
   renderTaskPage();
   updateCurrentTaskOptions();
+  runCloudSync(async () => {
+    for (const task of carriedTasks) {
+      const created = await createTaskInCloud(task, getTodayKey());
+      applyCreatedCloudTask(task, created.task);
+    }
+    saveDailyPlans();
+    renderTaskPage();
+    updateCurrentTaskOptions();
+  });
 }
 
 function renderTaskPage() {
@@ -527,6 +1771,29 @@ function updateCurrentTaskOptions() {
   });
 
   currentTaskSelect.value = selectedTaskExists ? todayData.currentTaskId : "";
+}
+
+function updateCurrentGoalOptions() {
+  if (!currentGoalSelect) {
+    return;
+  }
+
+  const activeGoals = studyGoals.filter((goal) => !goal.completed);
+  const selectedGoalExists = activeGoals.some((goal) => goal.id === todayData.currentStudyGoalId);
+
+  if (todayData.currentStudyGoalId && !selectedGoalExists) {
+    todayData.currentStudyGoalId = "";
+    saveTodayData();
+  }
+
+  currentGoalSelect.innerHTML = "";
+  currentGoalSelect.appendChild(createTaskOption("", activeGoals.length ? "暂未选择目标" : "暂无进行中目标"));
+
+  activeGoals.forEach((goal) => {
+    currentGoalSelect.appendChild(createTaskOption(goal.id, goal.title));
+  });
+
+  currentGoalSelect.value = selectedGoalExists ? todayData.currentStudyGoalId : "";
 }
 
 function initSwipeTaskCard(cardElement, task) {
@@ -664,6 +1931,7 @@ function completeTaskWithAnimation(taskId) {
   saveDailyPlans();
   renderTaskPage();
   updateCurrentTaskOptions();
+  runCloudSync(() => syncTaskPatch(task, { completed: true }));
   showTaskToast(`已完成：${task.title}`, () => undoCompleteTask(task.id));
 }
 
@@ -680,6 +1948,7 @@ function undoCompleteTask(taskId) {
   saveDailyPlans();
   renderTaskPage();
   updateCurrentTaskOptions();
+  runCloudSync(() => syncTaskPatch(task, { completed: false }));
   hideTaskToast();
 }
 
@@ -771,6 +2040,15 @@ function updateCurrentTaskSelection() {
   todayData.currentTaskId = task ? task.id : "";
   todayData.currentTask = task ? task.title : "";
   saveTodayData();
+  runCloudSync(syncSettingsToCloud);
+}
+
+function updateCurrentGoalSelection() {
+  const goal = studyGoals.find((item) => item.id === currentGoalSelect.value);
+
+  todayData.currentStudyGoalId = goal ? goal.id : "";
+  saveTodayData();
+  runCloudSync(syncSettingsToCloud);
 }
 
 function renderCarryOverBanner() {
@@ -790,8 +2068,17 @@ function normalizeTask(task) {
     return null;
   }
 
+  const syncedTaskId = typeof task.syncedTaskId === "string" && task.syncedTaskId
+    ? task.syncedTaskId
+    : (typeof task.id === "string" && task.clientId ? task.id : "");
+  const clientId = typeof task.clientId === "string" && task.clientId
+    ? task.clientId
+    : (syncedTaskId ? "" : (typeof task.id === "string" ? task.id : createTaskId()));
+
   return {
-    id: typeof task.id === "string" ? task.id : createTaskId(),
+    id: syncedTaskId || clientId || createTaskId(),
+    clientId,
+    syncedTaskId,
     title: task.title.trim(),
     completed: Boolean(task.completed),
     createdAt: typeof task.createdAt === "string" ? task.createdAt : new Date().toISOString(),
@@ -802,6 +2089,14 @@ function normalizeTask(task) {
 
 function createTaskId() {
   return `task-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function createFocusRecordId() {
+  return `focus-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function createStudyGoalId() {
+  return `goal-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 function createTaskOption(value, text) {
@@ -843,6 +2138,10 @@ function switchPage(pageName) {
     button.classList.toggle("active", isActive);
     button.setAttribute("aria-current", isActive ? "page" : "false");
   });
+
+  if (pageName === "stats" && isCloudSyncEnabled() && cloudStats.status === "idle") {
+    fetchCloudStats(cloudStats.range);
+  }
 }
 
 function handlePetShellKeydown(event) {
@@ -882,8 +2181,32 @@ function finishCurrentMode() {
   playFinishSound();
 
   if (currentMode === "focus") {
-    addFocusRecord();
+    const focusRecord = addFocusRecord();
     const xpResult = addPetXP(MODES.focus.minutes);
+    focusRecord.xpEarned = xpResult.totalXP;
+    saveTodayData();
+    runCloudSync(async () => {
+      const created = await apiRequest("/api/focus-sessions", {
+        method: "POST",
+        body: {
+          clientId: focusRecord.id,
+          taskId: todayData.currentTaskId || null,
+          studyGoalId: todayData.currentStudyGoalId || null,
+          taskTitle: focusRecord.task,
+          minutes: focusRecord.minutes,
+          startedAt: focusRecord.startedAt,
+          endedAt: focusRecord.endedAt,
+          streak: focusRecord.streak,
+          xpEarned: xpResult.totalXP
+        }
+      });
+      focusRecord.syncedSessionId = created.focusSession.id;
+      await syncPetToCloud();
+      await syncSettingsToCloud();
+      await pullCloudState();
+      await fetchCloudStats(cloudStats.range, { silent: true });
+      saveTodayData(false);
+    });
     showNotification("专注完成", `完成 1 个番茄，宠物获得了 ${xpResult.totalXP} XP。`);
     const nextRestType = todayData.completedCount % 4 === 0 ? "long" : "short";
     setRestType(nextRestType);
@@ -906,6 +2229,8 @@ function finishCurrentMode() {
 
 function addFocusRecord() {
   const task = todayData.currentTask || "未命名学习任务";
+  const endedAt = new Date().toISOString();
+  const startedAt = new Date(new Date(endedAt).getTime() - MODES.focus.minutes * 60 * 1000).toISOString();
   const time = new Date().toLocaleTimeString("zh-CN", {
     hour: "2-digit",
     minute: "2-digit"
@@ -915,13 +2240,21 @@ function addFocusRecord() {
   todayData.streak += 1;
   todayData.focusMinutes += MODES.focus.minutes;
   todayData.records.unshift({
+    id: createFocusRecordId(),
+    syncedSessionId: "",
+    taskId: todayData.currentTaskId || "",
+    studyGoalId: todayData.currentStudyGoalId || "",
     time,
     task,
     minutes: MODES.focus.minutes,
-    streak: todayData.streak
+    streak: todayData.streak,
+    xpEarned: 0,
+    startedAt,
+    endedAt
   });
 
   saveTodayData();
+  return todayData.records[0];
 }
 
 function clearTodayRecords() {
@@ -952,6 +2285,7 @@ function loadTodayData() {
     streak: 0,
     currentTask: "",
     currentTaskId: "",
+    currentStudyGoalId: "",
     dailyGoal: DEFAULT_GOAL,
     focusDuration: DEFAULT_FOCUS_MINUTES,
     nextRestType: "short",
@@ -976,6 +2310,7 @@ function loadTodayData() {
         ...defaultData,
         currentTask: "",
         currentTaskId: "",
+        currentStudyGoalId: "",
         dailyGoal: normalizeGoal(saved.dailyGoal),
         focusDuration: normalizeFocusDuration(saved.focusDuration),
         nextRestType: "short",
@@ -990,11 +2325,12 @@ function loadTodayData() {
       ...saved,
       streak: normalizeNonNegativeInteger(saved.streak),
       currentTaskId: typeof saved.currentTaskId === "string" ? saved.currentTaskId : "",
+      currentStudyGoalId: typeof saved.currentStudyGoalId === "string" ? saved.currentStudyGoalId : "",
       dailyGoal: normalizeGoal(saved.dailyGoal),
       focusDuration: normalizeFocusDuration(saved.focusDuration),
       nextRestType: normalizeRestType(saved.nextRestType),
       theme: saved.theme === "dark" ? "dark" : "light",
-      records: Array.isArray(saved.records) ? saved.records : [],
+      records: Array.isArray(saved.records) ? saved.records.map(normalizeFocusRecord).filter(Boolean) : [],
       selectedPet,
       petProgress
     };
@@ -1003,16 +2339,60 @@ function loadTodayData() {
   }
 }
 
-function saveTodayData() {
+function saveTodayData(syncCloud = true) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(todayData));
+
+  if (syncCloud) {
+    runCloudSync(async () => {
+      await syncSettingsToCloud();
+      await syncPetToCloud();
+    });
+  }
 }
 
-function getDateKey() {
-  const now = new Date();
+function getDateKey(date = new Date()) {
+  const now = date instanceof Date ? date : new Date(date);
+
+  if (Number.isNaN(now.getTime())) {
+    return getDateKey();
+  }
+
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function normalizeFocusRecord(record) {
+  if (!record || typeof record !== "object") {
+    return null;
+  }
+
+  const endedAt = Number.isNaN(new Date(record.endedAt).getTime())
+    ? new Date().toISOString()
+    : record.endedAt;
+  const minutes = normalizeNonNegativeInteger(record.minutes);
+
+  return {
+    id: typeof record.id === "string" && record.id ? record.id : createFocusRecordId(),
+    syncedSessionId: typeof record.syncedSessionId === "string" ? record.syncedSessionId : "",
+    taskId: typeof record.taskId === "string" ? record.taskId : "",
+    studyGoalId: typeof record.studyGoalId === "string" ? record.studyGoalId : "",
+    time: typeof record.time === "string" && record.time
+      ? record.time
+      : new Date(endedAt).toLocaleTimeString("zh-CN", {
+        hour: "2-digit",
+        minute: "2-digit"
+      }),
+    task: typeof record.task === "string" && record.task ? record.task : "未命名学习任务",
+    minutes,
+    streak: normalizeNonNegativeInteger(record.streak),
+    xpEarned: normalizeNonNegativeInteger(record.xpEarned || minutes),
+    startedAt: Number.isNaN(new Date(record.startedAt).getTime())
+      ? new Date(new Date(endedAt).getTime() - minutes * 60 * 1000).toISOString()
+      : record.startedAt,
+    endedAt
+  };
 }
 
 function render() {
@@ -1024,6 +2404,8 @@ function render() {
   renderGoalProgress();
   renderTaskPage();
   updateCurrentTaskOptions();
+  renderStudyGoals();
+  updateCurrentGoalOptions();
   renderRecords();
   renderPetPicker();
   updatePetUI();
@@ -1076,6 +2458,7 @@ function renderRestPanel() {
 function renderStats() {
   doneCount.textContent = todayData.completedCount;
   focusMinutes.textContent = todayData.focusMinutes;
+  renderCloudStats();
 }
 
 function renderGoalProgress() {

@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaoyan-pomodoro-v14";
+const CACHE_NAME = "kaoyan-pomodoro-v15";
 const ASSETS = [
   "./",
   "./index.html",
@@ -35,7 +35,13 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
+  const requestUrl = new URL(event.request.url);
+
   if (event.request.method !== "GET") {
+    return;
+  }
+
+  if (requestUrl.pathname.startsWith("/api/")) {
     return;
   }
 
