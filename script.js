@@ -128,11 +128,18 @@ let manualSyncButton = null;
 let lastSyncText = null;
 let cloudStatsPanel = null;
 let studyGoalsPanel = null;
+let aiSummaryPanel = null;
 let cloudStats = {
   range: "week",
   status: "idle",
   data: null,
   error: ""
+};
+let aiSummary = {
+  status: "idle",
+  data: null,
+  error: "",
+  generatedAt: ""
 };
 
 let currentMode = "focus";
@@ -159,6 +166,7 @@ switchPage("timer");
 setupAuthUI();
 setupCloudStatsUI();
 setupStudyGoalsUI();
+setupAiSummaryUI();
 setupCurrentGoalUI();
 refreshAuthUI();
 bootstrapCloudSession();
@@ -354,7 +362,14 @@ async function logoutFromCloud() {
     data: null,
     error: ""
   };
+  aiSummary = {
+    status: "idle",
+    data: null,
+    error: "",
+    generatedAt: ""
+  };
   renderCloudStats();
+  renderAiSummary();
   setSyncStatus("已回到本地模式");
 }
 
@@ -435,15 +450,20 @@ async function apiRequest(path, options = {}) {
 
   if (!response.ok) {
     let message = "请求失败";
+    let code = "";
 
     try {
       const payload = await response.json();
       message = payload.error || message;
+      code = payload.code || "";
     } catch (error) {
       message = response.statusText || message;
     }
 
-    throw new Error(message);
+    const requestError = new Error(message);
+    requestError.status = response.status;
+    requestError.code = code;
+    throw requestError;
   }
 
   if (response.status === 204) {
@@ -482,6 +502,7 @@ async function performFullCloudSync(message = "正在同步...") {
     await fetchCloudStats(cloudStats.range, { silent: true });
     markCloudSynced();
     refreshAuthUI();
+    renderAiSummary();
     setSyncStatus("同步完成");
   } finally {
     if (manualSyncButton) {
@@ -526,9 +547,9 @@ function formatLastSyncTime(value) {
 }
 
 function setupCloudStatsUI() {
-  const statsPage = document.querySelector('.app-page[data-page="stats"]');
+  const trendsPage = document.querySelector('.app-page[data-page="trends"]');
 
-  if (!statsPage) {
+  if (!trendsPage) {
     return;
   }
 
@@ -558,7 +579,7 @@ function setupCloudStatsUI() {
     </div>
   `;
 
-  statsPage.appendChild(cloudStatsPanel);
+  trendsPage.appendChild(cloudStatsPanel);
   cloudStatsPanel.querySelectorAll("[data-stats-range]").forEach((button) => {
     button.addEventListener("click", () => fetchCloudStats(button.dataset.statsRange));
   });
@@ -745,10 +766,164 @@ function formatStatsDateLabel(value) {
   return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
-function setupStudyGoalsUI() {
-  const statsPage = document.querySelector('.app-page[data-page="stats"]');
+function setupAiSummaryUI() {
+  const reviewPage = document.querySelector('.app-page[data-page="review"]');
 
-  if (!statsPage) {
+  if (!reviewPage) {
+    return;
+  }
+
+  aiSummaryPanel = document.createElement("section");
+  aiSummaryPanel.className = "card ai-summary-card";
+  aiSummaryPanel.innerHTML = `
+    <div class="section-title ai-summary-head">
+      <div>
+        <p class="stats-kicker">AI 学习教练</p>
+        <h2>今日总结与明日建议</h2>
+      </div>
+      <button class="primary-btn ai-summary-generate" id="aiSummaryGenerate" type="button">生成今日总结</button>
+    </div>
+    <p class="ai-summary-hint" id="aiSummaryHint"></p>
+    <div class="ai-summary-body" id="aiSummaryBody"></div>
+  `;
+
+  reviewPage.appendChild(aiSummaryPanel);
+  aiSummaryPanel.querySelector("#aiSummaryGenerate").addEventListener("click", () => fetchDailyAiSummary());
+  renderAiSummary();
+}
+
+async function fetchDailyAiSummary(options = {}) {
+  if (!isCloudSyncEnabled()) {
+    aiSummary = {
+      status: "idle",
+      data: null,
+      error: "",
+      generatedAt: ""
+    };
+    renderAiSummary();
+    return;
+  }
+
+  try {
+    aiSummary = {
+      ...aiSummary,
+      status: "loading",
+      error: options.auto ? "专注完成，正在生成今天的 AI 复盘..." : ""
+    };
+    renderAiSummary();
+
+    const data = await apiRequest("/api/ai/daily-summary", {
+      method: "POST",
+      body: { dateKey: getTodayKey() }
+    });
+    aiSummary = {
+      status: "ready",
+      data: data.summary,
+      error: "",
+      generatedAt: data.generatedAt || new Date().toISOString()
+    };
+  } catch (error) {
+    aiSummary = {
+      ...aiSummary,
+      status: "error",
+      error: error.code === "AI_NOT_CONFIGURED"
+        ? "AI 总结还没有配置。部署时在服务端环境变量里添加 OPENAI_API_KEY 后，这里就会自动生成复盘。"
+        : error.message
+    };
+  }
+
+  renderAiSummary();
+}
+
+function renderAiSummary() {
+  if (!aiSummaryPanel) {
+    return;
+  }
+
+  const hint = aiSummaryPanel.querySelector("#aiSummaryHint");
+  const body = aiSummaryPanel.querySelector("#aiSummaryBody");
+  const button = aiSummaryPanel.querySelector("#aiSummaryGenerate");
+  button.disabled = aiSummary.status === "loading" || !isCloudSyncEnabled();
+
+  if (!isCloudSyncEnabled()) {
+    hint.textContent = "登录后，AI 会基于跨设备同步的任务、专注记录和学习目标生成复盘。";
+    body.innerHTML = `<p class="ai-summary-empty">先登录/注册账号，完成一个番茄后，这里会出现当天总结和第二天建议。</p>`;
+    return;
+  }
+
+  if (aiSummary.status === "loading") {
+    hint.textContent = aiSummary.error || "AI 正在读取今天的学习记录...";
+    body.innerHTML = `
+      <div class="ai-summary-loading">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    `;
+    return;
+  }
+
+  if (aiSummary.status === "error") {
+    hint.textContent = "AI 总结暂时不可用。";
+    body.innerHTML = `<p class="ai-summary-empty">${escapeHtml(aiSummary.error || "请稍后重试。")}</p>`;
+    return;
+  }
+
+  if (!aiSummary.data) {
+    hint.textContent = "完成学习后可自动生成，也可以随时手动刷新今天的 AI 复盘。";
+    body.innerHTML = `<p class="ai-summary-empty">还没有生成今日总结。点一下按钮，让 AI 教练帮你把今天收束成明天的行动。</p>`;
+    return;
+  }
+
+  hint.textContent = aiSummary.generatedAt
+    ? `最近生成：${formatAiGeneratedAt(aiSummary.generatedAt)}`
+    : "已生成今日 AI 复盘。";
+  body.innerHTML = `
+    <article class="ai-summary-main">
+      <h3>${escapeHtml(aiSummary.data.title)}</h3>
+      <p>${escapeHtml(aiSummary.data.todaySummary)}</p>
+    </article>
+    ${renderAiSummaryList("亮点", aiSummary.data.highlights)}
+    ${renderAiSummaryList("风险提醒", aiSummary.data.risks)}
+    ${renderAiSummaryList("明日建议", aiSummary.data.tomorrowPlan)}
+    <blockquote class="ai-summary-encouragement">${escapeHtml(aiSummary.data.encouragement)}</blockquote>
+  `;
+}
+
+function renderAiSummaryList(title, items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return "";
+  }
+
+  return `
+    <section class="ai-summary-section">
+      <strong>${title}</strong>
+      <ul>
+        ${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+      </ul>
+    </section>
+  `;
+}
+
+function formatAiGeneratedAt(value) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return date.toLocaleString("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function setupStudyGoalsUI() {
+  const goalsPage = document.querySelector('.app-page[data-page="goals"]');
+
+  if (!goalsPage) {
     return;
   }
 
@@ -771,8 +946,7 @@ function setupStudyGoalsUI() {
     <ul class="study-goal-list" id="studyGoalList"></ul>
   `;
 
-  const cloudStatsCard = statsPage.querySelector(".cloud-stats-card");
-  statsPage.insertBefore(studyGoalsPanel, cloudStatsCard || null);
+  goalsPage.appendChild(studyGoalsPanel);
   studyGoalsPanel.querySelector("#studyGoalForm").addEventListener("submit", handleStudyGoalSubmit);
   renderStudyGoals();
 }
@@ -2139,7 +2313,7 @@ function switchPage(pageName) {
     button.setAttribute("aria-current", isActive ? "page" : "false");
   });
 
-  if (pageName === "stats" && isCloudSyncEnabled() && cloudStats.status === "idle") {
+  if (pageName === "trends" && isCloudSyncEnabled() && cloudStats.status === "idle") {
     fetchCloudStats(cloudStats.range);
   }
 }
@@ -2205,6 +2379,7 @@ function finishCurrentMode() {
       await syncSettingsToCloud();
       await pullCloudState();
       await fetchCloudStats(cloudStats.range, { silent: true });
+      await fetchDailyAiSummary({ auto: true });
       saveTodayData(false);
     });
     showNotification("专注完成", `完成 1 个番茄，宠物获得了 ${xpResult.totalXP} XP。`);
@@ -2459,6 +2634,7 @@ function renderStats() {
   doneCount.textContent = todayData.completedCount;
   focusMinutes.textContent = todayData.focusMinutes;
   renderCloudStats();
+  renderAiSummary();
 }
 
 function renderGoalProgress() {

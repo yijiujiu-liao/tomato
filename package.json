@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
-    "check": "node --check script.js && node --check server/config.js && node --check server/index.js && node --check server/db.js && node --check server/auth.js && node --check tests/api.test.js",
+    "check": "node --check script.js && node --check server/config.js && node --check server/index.js && node --check server/db.js && node --check server/auth.js && node --check scripts/seed-demo-data.mjs && node --check tests/api.test.js",
+    "seed:demo": "node scripts/seed-demo-data.mjs",
     "test": "node --test tests/api.test.js"
   },
   "dependencies": {

@@ -8,8 +8,9 @@
 - 账号系统：注册、登录、会话认证、退出登录。
 - 云端同步：每日任务、专注记录、学习目标、学习设置、宠物成长进度。
 - 学习统计：每日 / 每周 / 每月统计、学习天数、日均分钟、连续学习天数、最佳学习日、近 30 天热力图。
+- AI 学习教练：学习结束后可基于当天专注、任务和目标自动生成今日总结与明日建议。
 - 成长激励：完成专注后获得宠物 XP，并可把专注时间归因到长期学习目标。
-- 后端测试：核心 API 集成测试覆盖认证、同步、统计、幂等离线补传。
+- 后端测试：核心 API 集成测试覆盖认证、同步、统计、AI 配置兜底、幂等离线补传。
 
 ## 本地启动
 
@@ -45,6 +46,13 @@ NODE_ENV=production
 PORT=3000
 DATABASE_PATH=./data/tomato.sqlite
 SESSION_TTL_DAYS=30
+AI_PROVIDER=openai
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-5.5
+OPENAI_BASE_URL=https://api.openai.com/v1
+DEEPSEEK_API_KEY=
+DEEPSEEK_MODEL=deepseek-v4-flash
+DEEPSEEK_BASE_URL=https://api.deepseek.com
 ```
 
 说明：
@@ -53,6 +61,13 @@ SESSION_TTL_DAYS=30
 - `PORT`：后端监听端口，范围 `1-65535`。
 - `DATABASE_PATH`：SQLite 数据库文件位置。
 - `SESSION_TTL_DAYS`：登录会话有效天数，范围 `1-365`。
+- `AI_PROVIDER`：AI 总结提供商，可选 `openai` 或 `deepseek`，默认 `openai`。
+- `OPENAI_API_KEY`：服务端调用 OpenAI 的密钥。不要写进前端代码，也不要提交到 Git。
+- `OPENAI_MODEL`：AI 总结使用的模型，默认 `gpt-5.5`。
+- `OPENAI_BASE_URL`：OpenAI API 地址，默认 `https://api.openai.com/v1`。
+- `DEEPSEEK_API_KEY`：服务端调用 DeepSeek 的密钥。使用 DeepSeek 时设置 `AI_PROVIDER=deepseek`。
+- `DEEPSEEK_MODEL`：DeepSeek 总结使用的模型，默认 `deepseek-v4-flash`。
+- `DEEPSEEK_BASE_URL`：DeepSeek API 地址，默认 `https://api.deepseek.com`。
 
 ## API 概览
 
@@ -96,10 +111,16 @@ Authorization: Bearer <token>
 - `POST /api/focus-sessions`
 - `GET /api/stats?range=day|week|month`
 
+AI 学习教练：
+
+- `POST /api/ai/daily-summary`
+
+该接口会读取登录用户当天的任务、专注记录、学习目标和宠物成长数据，返回结构化的今日总结、风险提醒、第二天学习建议和鼓励语。未配置对应 provider 的 API Key 时会返回 `503` 与 `AI_NOT_CONFIGURED`。
+
 ## 部署提示
 
 1. 使用 Node.js `>=24.0.0`。
-2. 设置 `NODE_ENV=production`、`DATABASE_PATH` 和 `SESSION_TTL_DAYS`。
+2. 设置 `NODE_ENV=production`、`DATABASE_PATH`、`SESSION_TTL_DAYS`，如需 AI 总结再设置 OpenAI 或 DeepSeek 的环境变量。
 3. 确保 `DATABASE_PATH` 所在目录可写并可持久化。
 4. 部署后检查 `/api/health` 和 `/api/ready`。
 5. 当前使用 Node.js 内置 SQLite，Node 会提示实验性警告；生产长期使用时建议评估迁移到稳定 SQLite 包或托管数据库。
@@ -117,6 +138,8 @@ Authorization: Bearer <token>
    - Health Check Path: `/api/health`
    - Disk Mount Path: `/var/data`
    - `DATABASE_PATH=/var/data/tomato.sqlite`
+   - OpenAI：`AI_PROVIDER=openai`、`OPENAI_API_KEY=你的 OpenAI API Key`
+   - DeepSeek：`AI_PROVIDER=deepseek`、`DEEPSEEK_API_KEY=你的 DeepSeek API Key`
 5. 部署完成后访问：
    - `https://你的服务域名/`
    - `https://你的服务域名/api/health`

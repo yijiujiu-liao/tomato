@@ -635,6 +635,32 @@ app.get("/api/stats", requireAuth, (req, res) => {
   });
 });
 
+app.post("/api/ai/daily-summary", requireAuth, async (req, res, next) => {
+  try {
+    if (!getAiApiKey()) {
+      res.status(503).json({
+        code: "AI_NOT_CONFIGURED",
+        error: "AI 总结尚未配置密钥。请在服务器环境变量中添加 OPENAI_API_KEY 或 DEEPSEEK_API_KEY 后重试。"
+      });
+      return;
+    }
+
+    const dateKey = normalizeDateKey(req.body?.dateKey);
+    const context = buildDailySummaryContext(req.auth.user.id, dateKey);
+    const summary = await generateDailySummary(context);
+
+    res.json({
+      dateKey,
+      model: getAiModel(),
+      source: config.aiProvider,
+      generatedAt: nowIso(),
+      summary
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.use((req, res, next) => {
   if (req.path.startsWith("/api/")) {
     res.status(404).json({ error: "API 不存在。" });
@@ -828,6 +854,277 @@ function formatDateKey(date) {
   const day = String(date.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
+}
+
+function buildDailySummaryContext(userId, dateKey) {
+  const tasks = db.prepare(`
+    SELECT
+      id,
+      title,
+      completed,
+      completed_at AS completedAt,
+      created_at AS createdAt
+    FROM tasks
+    WHERE user_id = ? AND date_key = ?
+    ORDER BY created_at ASC
+  `).all(userId, dateKey).map((task) => ({
+    id: task.id,
+    title: task.title,
+    completed: Boolean(task.completed),
+    completedAt: task.completedAt,
+    createdAt: task.createdAt
+  }));
+
+  const focusSessions = db.prepare(`
+    SELECT
+      task_title AS taskTitle,
+      study_goal_id AS studyGoalId,
+      minutes,
+      started_at AS startedAt,
+      ended_at AS endedAt,
+      streak,
+      xp_earned AS xpEarned
+    FROM focus_sessions
+    WHERE user_id = ?
+      AND mode = 'focus'
+      AND date(ended_at, 'localtime') = ?
+    ORDER BY ended_at ASC
+  `).all(userId, dateKey).map((session) => ({
+    taskTitle: session.taskTitle,
+    studyGoalId: session.studyGoalId,
+    minutes: Number(session.minutes) || 0,
+    startedAt: session.startedAt,
+    endedAt: session.endedAt,
+    streak: Number(session.streak) || 0,
+    xpEarned: Number(session.xpEarned) || 0
+  }));
+
+  const studyGoals = db.prepare(`
+    SELECT
+      study_goals.id,
+      study_goals.title,
+      study_goals.target_minutes AS targetMinutes,
+      study_goals.target_date AS targetDate,
+      study_goals.completed,
+      COALESCE(SUM(CASE WHEN focus_sessions.mode = 'focus' THEN focus_sessions.minutes ELSE 0 END), 0) AS focusMinutes
+    FROM study_goals
+    LEFT JOIN focus_sessions
+      ON focus_sessions.study_goal_id = study_goals.id
+      AND focus_sessions.user_id = study_goals.user_id
+    WHERE study_goals.user_id = ?
+    GROUP BY study_goals.id
+    ORDER BY study_goals.completed ASC, study_goals.updated_at DESC
+    LIMIT 8
+  `).all(userId).map((goal) => {
+    const targetMinutes = Number(goal.targetMinutes) || 0;
+    const focusMinutes = Number(goal.focusMinutes) || 0;
+
+    return {
+      id: goal.id,
+      title: goal.title,
+      targetMinutes,
+      targetDate: goal.targetDate,
+      completed: Boolean(goal.completed),
+      focusMinutes,
+      progressPercent: targetMinutes > 0 ? Math.min(100, Math.round((focusMinutes / targetMinutes) * 100)) : 0
+    };
+  });
+
+  const user = db.prepare("SELECT display_name AS displayName FROM users WHERE id = ?").get(userId);
+  const pet = db.prepare("SELECT * FROM pets WHERE user_id = ?").get(userId);
+  const focusMinutes = focusSessions.reduce((total, session) => total + session.minutes, 0);
+  const completedTasks = tasks.filter((task) => task.completed).length;
+
+  return {
+    dateKey,
+    user: {
+      displayName: user?.displayName || "考研同学"
+    },
+    totals: {
+      completedFocusSessions: focusSessions.length,
+      focusMinutes,
+      xpEarned: focusSessions.reduce((total, session) => total + session.xpEarned, 0),
+      completedTasks,
+      plannedTasks: tasks.length
+    },
+    tasks,
+    focusSessions,
+    studyGoals,
+    pet: pet ? petFromRow(pet) : null
+  };
+}
+
+async function generateDailySummary(context) {
+  if (config.aiProvider === "deepseek") {
+    return generateDeepSeekDailySummary(context);
+  }
+
+  return generateOpenAiDailySummary(context);
+}
+
+async function generateOpenAiDailySummary(context) {
+  const response = await fetch(`${config.openaiBaseUrl.replace(/\/$/, "")}/responses`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.openaiApiKey}`
+    },
+    body: JSON.stringify({
+      model: config.openaiModel,
+      store: false,
+      max_output_tokens: 1000,
+      input: [
+        {
+          role: "system",
+          content: "你是一位温和、具体、擅长考研复习节奏管理的 AI 学习教练。请基于数据给出客观总结和可执行建议，不要编造不存在的学习内容。"
+        },
+        {
+          role: "user",
+          content: `请为这位考研学生生成当天学习总结和第二天建议。输出必须是中文 JSON，并严格符合给定 schema。学习数据：${JSON.stringify(context)}`
+        }
+      ],
+      text: {
+        format: {
+          type: "json_schema",
+          name: "daily_study_summary",
+          strict: true,
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            required: ["title", "todaySummary", "highlights", "risks", "tomorrowPlan", "encouragement"],
+            properties: {
+              title: { type: "string" },
+              todaySummary: { type: "string" },
+              highlights: {
+                type: "array",
+                items: { type: "string" }
+              },
+              risks: {
+                type: "array",
+                items: { type: "string" }
+              },
+              tomorrowPlan: {
+                type: "array",
+                items: { type: "string" }
+              },
+              encouragement: { type: "string" }
+            }
+          }
+        }
+      }
+    })
+  });
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const error = new Error(payload?.error?.message || payload?.error || "AI 总结生成失败。");
+    error.statusCode = response.status >= 500 ? 502 : response.status;
+    throw error;
+  }
+
+  try {
+    return normalizeDailySummary(JSON.parse(extractOpenAIText(payload)));
+  } catch (error) {
+    const parseError = new Error("AI 返回内容无法解析，请稍后重试。");
+    parseError.statusCode = 502;
+    throw parseError;
+  }
+}
+
+async function generateDeepSeekDailySummary(context) {
+  const response = await fetch(`${config.deepseekBaseUrl.replace(/\/$/, "")}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.deepseekApiKey}`
+    },
+    body: JSON.stringify({
+      model: config.deepseekModel,
+      temperature: 0.4,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: "你是一位温和、具体、擅长考研复习节奏管理的 AI 学习教练。请基于数据给出客观总结和可执行建议，不要编造不存在的学习内容。你必须只输出 JSON 对象，不要输出 Markdown。"
+        },
+        {
+          role: "user",
+          content: `请为这位考研学生生成当天学习总结和第二天建议。输出必须是中文 JSON 对象，字段必须包含 title、todaySummary、highlights、risks、tomorrowPlan、encouragement。highlights、risks、tomorrowPlan 必须是字符串数组。学习数据：${JSON.stringify(context)}`
+        }
+      ]
+    })
+  });
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const error = new Error(payload?.error?.message || payload?.error || "AI 总结生成失败。");
+    error.statusCode = response.status >= 500 ? 502 : response.status;
+    throw error;
+  }
+
+  try {
+    return normalizeDailySummary(JSON.parse(extractDeepSeekText(payload)));
+  } catch (error) {
+    const parseError = new Error("AI 返回内容无法解析，请稍后重试。");
+    parseError.statusCode = 502;
+    throw parseError;
+  }
+}
+
+function extractOpenAIText(payload) {
+  if (typeof payload?.output_text === "string" && payload.output_text.trim()) {
+    return payload.output_text;
+  }
+
+  const content = (payload?.output || [])
+    .flatMap((item) => item.content || [])
+    .find((item) => typeof item.text === "string" && item.text.trim());
+
+  if (content?.text) {
+    return content.text;
+  }
+
+  throw new Error("OpenAI response did not include text output.");
+}
+
+function extractDeepSeekText(payload) {
+  const text = payload?.choices?.[0]?.message?.content;
+
+  if (typeof text === "string" && text.trim()) {
+    return text;
+  }
+
+  throw new Error("DeepSeek response did not include message content.");
+}
+
+function getAiApiKey() {
+  return config.aiProvider === "deepseek" ? config.deepseekApiKey : config.openaiApiKey;
+}
+
+function getAiModel() {
+  return config.aiProvider === "deepseek" ? config.deepseekModel : config.openaiModel;
+}
+
+function normalizeDailySummary(summary) {
+  return {
+    title: String(summary?.title || "今日学习复盘").trim().slice(0, 80),
+    todaySummary: String(summary?.todaySummary || "今天的学习记录已同步。").trim().slice(0, 500),
+    highlights: normalizeSummaryList(summary?.highlights, 4),
+    risks: normalizeSummaryList(summary?.risks, 3),
+    tomorrowPlan: normalizeSummaryList(summary?.tomorrowPlan, 5),
+    encouragement: String(summary?.encouragement || "稳住节奏，明天继续。").trim().slice(0, 240)
+  };
+}
+
+function normalizeSummaryList(value, maxItems) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => String(item || "").trim().slice(0, 180))
+    .filter(Boolean)
+    .slice(0, maxItems);
 }
 
 function toTaskRow(task) {

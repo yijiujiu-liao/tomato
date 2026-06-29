@@ -28,7 +28,15 @@ async function request(baseUrl, path, options = {}) {
   const body = text ? JSON.parse(text) : null;
 
   if (!response.ok) {
+    if (options.expectedStatus === response.status) {
+      return body;
+    }
+
     throw new Error(body?.error || response.statusText);
+  }
+
+  if (options.expectedStatus && options.expectedStatus !== response.status) {
+    throw new Error(`Expected ${options.expectedStatus}, received ${response.status}`);
   }
 
   return body;
@@ -202,6 +210,14 @@ test("core study management API supports auth, sync, stats, and idempotent offli
   assert.equal(monthStats.days.length, 30);
   assert.equal(monthStats.summary.activeDays, 2);
   assert.equal(monthStats.totals.focusMinutes, 80);
+
+  const missingAiConfig = await request(baseUrl, "/api/ai/daily-summary", {
+    method: "POST",
+    token,
+    expectedStatus: 503,
+    body: { dateKey: new Date().toISOString().slice(0, 10) }
+  });
+  assert.equal(missingAiConfig.code, "AI_NOT_CONFIGURED");
 
   const sync = await request(baseUrl, "/api/sync", { token });
   assert.equal(sync.settings.focusDuration, 45);

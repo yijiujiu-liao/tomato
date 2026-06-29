@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaoyan-pomodoro-v15";
+const CACHE_NAME = "kaoyan-pomodoro-v20";
 const ASSETS = [
   "./",
   "./index.html",
@@ -45,23 +45,23 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  const isAppShellRequest = event.request.mode === "navigate"
+    || ["/", "/index.html", "/style.css", "/script.js", "/sw.js"].includes(requestUrl.pathname);
+
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
+    fetch(event.request)
+      .then((networkResponse) => {
+        const responseCopy = networkResponse.clone();
 
-      return fetch(event.request)
-        .then((networkResponse) => {
-          const responseCopy = networkResponse.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, responseCopy);
+        });
 
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseCopy);
-          });
-
-          return networkResponse;
-        })
-        .catch(() => caches.match("./index.html"));
-    })
+        return networkResponse;
+      })
+      .catch(() => {
+        return caches.match(event.request)
+          .then((cachedResponse) => cachedResponse || (isAppShellRequest ? caches.match("./index.html") : null));
+      })
   );
 });

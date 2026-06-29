@@ -22,40 +22,17 @@
 
     <div class="page-shell">
       <section class="app-page active" data-page="timer" aria-label="计时页">
+        <div class="page-intro">
+          <p class="page-kicker">Focus</p>
+          <h2>专注计时</h2>
+          <span>选择任务，开始一轮稳定复习。</span>
+        </div>
+
         <section class="card timer-card" data-mode="focus" aria-label="番茄钟计时器">
           <div class="mode-tabs" aria-label="模式切换">
             <button class="mode-btn active" data-mode="focus">专注 50</button>
             <button class="mode-btn" data-mode="rest">休息 5</button>
           </div>
-
-          <section class="pet-panel" aria-label="专注宠物进化器">
-            <div class="section-title pet-title-row">
-              <h2>专注宠物</h2>
-              <span class="pet-meta" id="petStageLabel">幼体</span>
-            </div>
-            <div class="pet-picker" id="petPicker" aria-label="选择要培养的宠物"></div>
-            <div class="pet-shell" id="petShell" data-stage="juvenile" role="button" tabindex="0" aria-label="查看宠物进化预览">
-              <div class="pet-aura"></div>
-              <div class="pet-art" id="petArt" aria-live="polite"></div>
-              <div class="xp-toast" id="xpToast" aria-live="polite"></div>
-            </div>
-            <div class="pet-identity">
-              <p class="pet-name" id="petName">蓝莓企鹅</p>
-              <span class="pet-level" id="petLevelLabel">Lv.1</span>
-            </div>
-            <p class="pet-status" id="petStatus">完成番茄钟，宠物会获得经验并慢慢进化。</p>
-            <div class="pet-progress" aria-label="宠物经验进度">
-              <div class="pet-progress-fill" id="petProgressFill"></div>
-            </div>
-            <div class="pet-xp-row">
-              <span id="petXPText">0 / 100 XP</span>
-              <span id="evolutionHint">距离下一阶段还差 4 级</span>
-            </div>
-            <div class="pet-stats">
-              <span id="streakCount">今日连续 0</span>
-              <span id="petTotalXP">累计 0 XP</span>
-            </div>
-          </section>
 
           <section class="rest-panel" aria-label="休息恢复页">
             <div class="rest-scene" aria-hidden="true">
@@ -112,6 +89,12 @@
       </section>
 
       <section class="app-page" data-page="tasks" aria-label="今日计划页">
+        <div class="page-intro">
+          <p class="page-kicker">Tasks</p>
+          <h2>今日任务</h2>
+          <span>把今天要做的事拆清楚，完成后留下记录。</span>
+        </div>
+
         <section class="card task-card plan-card" aria-label="今日学习计划">
           <div class="plan-header">
             <div>
@@ -148,7 +131,13 @@
         </section>
       </section>
 
-      <section class="app-page" data-page="stats" aria-label="统计页">
+      <section class="app-page" data-page="goals" aria-label="学习目标页">
+        <div class="page-intro">
+          <p class="page-kicker">Goals</p>
+          <h2>学习目标</h2>
+          <span>管理今日番茄数量和长期复习目标。</span>
+        </div>
+
         <section class="card goal-card" aria-label="今日目标">
           <div class="section-title">
             <h2>今日目标</h2>
@@ -161,6 +150,53 @@
           </div>
           <p class="hint">例如设置为 8，完成 8 个专注番茄就是今日达标。</p>
         </section>
+      </section>
+
+      <section class="app-page" data-page="pet" aria-label="宠物成长页">
+        <div class="page-intro">
+          <p class="page-kicker">Growth</p>
+          <h2>宠物成长</h2>
+          <span>每一次完整专注，都会变成可见的成长。</span>
+        </div>
+
+        <section class="card pet-page-card" aria-label="专注宠物进化器">
+          <section class="pet-panel">
+            <div class="section-title pet-title-row">
+              <h2>专注宠物</h2>
+              <span class="pet-meta" id="petStageLabel">幼体</span>
+            </div>
+            <div class="pet-picker" id="petPicker" aria-label="选择要培养的宠物"></div>
+            <div class="pet-shell" id="petShell" data-stage="juvenile" role="button" tabindex="0" aria-label="查看宠物进化预览">
+              <div class="pet-aura"></div>
+              <div class="pet-art" id="petArt" aria-live="polite"></div>
+              <div class="xp-toast" id="xpToast" aria-live="polite"></div>
+            </div>
+            <div class="pet-identity">
+              <p class="pet-name" id="petName">蓝莓企鹅</p>
+              <span class="pet-level" id="petLevelLabel">Lv.1</span>
+            </div>
+            <p class="pet-status" id="petStatus">完成番茄钟，宠物会获得经验并慢慢进化。</p>
+            <div class="pet-progress" aria-label="宠物经验进度">
+              <div class="pet-progress-fill" id="petProgressFill"></div>
+            </div>
+            <div class="pet-xp-row">
+              <span id="petXPText">0 / 100 XP</span>
+              <span id="evolutionHint">距离下一阶段还差 4 级</span>
+            </div>
+            <div class="pet-stats">
+              <span id="streakCount">今日连续 0</span>
+              <span id="petTotalXP">累计 0 XP</span>
+            </div>
+          </section>
+        </section>
+      </section>
+
+      <section class="app-page" data-page="review" aria-label="学习复盘页">
+        <div class="page-intro">
+          <p class="page-kicker">Review</p>
+          <h2>今日复盘</h2>
+          <span>查看今日结果，让 AI 把学习转成明天的行动。</span>
+        </div>
 
         <section class="stats-grid" aria-label="今日统计">
           <article class="stat-card">
@@ -173,6 +209,14 @@
           </article>
         </section>
       </section>
+
+      <section class="app-page" data-page="trends" aria-label="学习趋势页">
+        <div class="page-intro">
+          <p class="page-kicker">Trends</p>
+          <h2>长期趋势</h2>
+          <span>查看云端统计、学习曲线和近 30 天稳定度。</span>
+        </div>
+      </section>
     </div>
 
     <nav class="bottom-nav" aria-label="功能分页">
@@ -184,9 +228,21 @@
         <span class="nav-icon">□</span>
         <span>任务</span>
       </button>
-      <button class="nav-btn" type="button" data-page-target="stats">
+      <button class="nav-btn" type="button" data-page-target="goals">
+        <span class="nav-icon">◎</span>
+        <span>目标</span>
+      </button>
+      <button class="nav-btn" type="button" data-page-target="pet">
+        <span class="nav-icon">♧</span>
+        <span>宠物</span>
+      </button>
+      <button class="nav-btn" type="button" data-page-target="review">
+        <span class="nav-icon">✦</span>
+        <span>复盘</span>
+      </button>
+      <button class="nav-btn" type="button" data-page-target="trends">
         <span class="nav-icon">▥</span>
-        <span>统计</span>
+        <span>趋势</span>
       </button>
     </nav>
   </main>
