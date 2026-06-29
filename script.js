@@ -1,70 +1,27 @@
-const MODES = {
-  focus: {
-    label: "专注",
-    minutes: 50
-  },
-  rest: {
-    label: "休息",
-    minutes: 5
-  }
-};
+import { createApiClient } from "./js/api.js";
+import { renderAiSummaryList } from "./js/components/aiSummary.js";
+import { renderCloudStatMetric } from "./js/components/stats.js";
+import { buildTaskCardHtml } from "./js/components/taskCard.js";
+import { renderHomePageView } from "./js/pages/home.js";
+import { renderTasksPageView } from "./js/pages/tasks.js";
+import {
+  AUTH_SESSION_KEY,
+  DAILY_PLANS_KEY,
+  DEFAULT_FOCUS_MINUTES,
+  DEFAULT_GOAL,
+  EVOLUTION_STAGES,
+  MAX_FOCUS_MINUTES,
+  MIN_FOCUS_MINUTES,
+  MODES,
+  MOTIVATION_TEXTS,
+  PET_TYPE_KEYS,
+  PET_TYPES,
+  REST_DURATIONS,
+  STATS_RANGES,
+  STORAGE_KEY,
+  STUDY_GOALS_KEY
+} from "./js/state.js";
 
-const STORAGE_KEY = "kaoyanPomodoroData";
-const DAILY_PLANS_KEY = "kaoyanDailyPlans";
-const AUTH_SESSION_KEY = "kaoyanPomodoroAuth";
-const STUDY_GOALS_KEY = "kaoyanStudyGoals";
-const DEFAULT_GOAL = 8;
-const DEFAULT_FOCUS_MINUTES = 50;
-const MIN_FOCUS_MINUTES = 1;
-const MAX_FOCUS_MINUTES = 180;
-const REST_DURATIONS = {
-  short: 5,
-  long: 10
-};
-const STATS_RANGES = {
-  day: "今日",
-  week: "本周",
-  month: "本月"
-};
-
-const PET_TYPES = {
-  penguin: {
-    name: "蓝莓企鹅",
-    src: "assets/pets/penguin.webp",
-    accent: "#9fc7ea"
-  },
-  purpleDragon: {
-    name: "紫晶小龙",
-    src: "assets/pets/purple-dragon.webp",
-    accent: "#9b6ee8"
-  },
-  greenDino: {
-    name: "青叶恐龙",
-    src: "assets/pets/green-dino.webp",
-    accent: "#94bd55"
-  },
-  chick: {
-    name: "奶油小鸡",
-    src: "assets/pets/chick.webp",
-    accent: "#f3c34a"
-  }
-};
-
-const PET_TYPE_KEYS = Object.keys(PET_TYPES);
-const EVOLUTION_STAGES = [
-  { id: 1, minLevel: 1, maxLevel: 4, state: "juvenile", label: "幼体", sprite: "egg" },
-  { id: 2, minLevel: 5, maxLevel: 9, state: "growth", label: "成长期", sprite: "crack" },
-  { id: 3, minLevel: 10, maxLevel: 19, state: "mature", label: "成熟体", sprite: "peek" },
-  { id: 4, minLevel: 20, maxLevel: Infinity, state: "complete", label: "完全体", sprite: "hatched" }
-];
-const MOTIVATION_TEXTS = [
-  "稳定学习比猛冲更重要。",
-  "你的专注正在让它成长。",
-  "距离下一次进化更近了。",
-  "今天的每一个番茄钟都会留下经验。"
-];
-
-const subtitle = document.querySelector("#subtitle");
 const timerCard = document.querySelector(".timer-card");
 const timerDisplay = document.querySelector("#timerDisplay");
 const timerProgressFill = document.querySelector("#timerProgressFill");
@@ -73,11 +30,25 @@ const statusText = document.querySelector("#statusText");
 const startBtn = document.querySelector("#startBtn");
 const pauseBtn = document.querySelector("#pauseBtn");
 const resetBtn = document.querySelector("#resetBtn");
+const abandonBtn = document.querySelector("#abandonBtn");
 const themeToggle = document.querySelector("#themeToggle");
+const profileThemeBtn = document.querySelector("#profileThemeBtn");
 const modeButtons = document.querySelectorAll(".mode-btn");
 const pageButtons = document.querySelectorAll(".nav-btn");
 const appPages = document.querySelectorAll(".app-page");
+const homeDateText = document.querySelector("#homeDateText");
+const homeTaskProgress = document.querySelector("#homeTaskProgress");
+const homeFocusMinutes = document.querySelector("#homeFocusMinutes");
+const homeGoalProgress = document.querySelector("#homeGoalProgress");
+const homeStreakText = document.querySelector("#homeStreakText");
+const homePetChip = document.querySelector("#homePetChip");
+const homeNextTaskTitle = document.querySelector("#homeNextTaskTitle");
+const homeNextTaskHint = document.querySelector("#homeNextTaskHint");
+const homeFocusBtn = document.querySelector("#homeFocusBtn");
+const homeAddTaskBtn = document.querySelector("#homeAddTaskBtn");
+const homeInsightsBtn = document.querySelector("#homeInsightsBtn");
 const focusDurationInput = document.querySelector("#focusDurationInput");
+const restDurationSelect = document.querySelector("#restDurationSelect");
 const currentTaskSelect = document.querySelector("#currentTaskSelect");
 let currentGoalSelect = null;
 const todayDateText = document.querySelector("#todayDateText");
@@ -98,6 +69,8 @@ const doneCount = document.querySelector("#doneCount");
 const focusMinutes = document.querySelector("#focusMinutes");
 const recordsList = document.querySelector("#recordsList");
 const clearRecordsBtn = document.querySelector("#clearRecordsBtn");
+const profileClearRecordsBtn = document.querySelector("#profileClearRecordsBtn");
+const profileInsightsBtn = document.querySelector("#profileInsightsBtn");
 const petShell = document.querySelector("#petShell");
 const petArt = document.querySelector("#petArt");
 const petPicker = document.querySelector("#petPicker");
@@ -108,6 +81,7 @@ const petProgressFill = document.querySelector("#petProgressFill");
 const petLevelLabel = document.querySelector("#petLevelLabel");
 const petXPText = document.querySelector("#petXPText");
 const evolutionHint = document.querySelector("#evolutionHint");
+const petTodayXP = document.querySelector("#petTodayXP");
 const streakCount = document.querySelector("#streakCount");
 const petTotalXP = document.querySelector("#petTotalXP");
 const xpToast = document.querySelector("#xpToast");
@@ -120,6 +94,7 @@ const restTypeLabel = document.querySelector("#restTypeLabel");
 const restCopy = document.querySelector("#restCopy");
 
 let authSession = loadAuthSession();
+const apiRequest = createApiClient({ getToken: () => authSession?.token });
 let authPanel = null;
 let authForm = null;
 let authMode = "login";
@@ -159,14 +134,15 @@ MODES.focus.minutes = todayData.focusDuration;
 MODES.rest.minutes = getRestMinutes();
 remainingSeconds = MODES.focus.minutes * 60;
 focusDurationInput.value = todayData.focusDuration;
+restDurationSelect.value = normalizeRestType(todayData.nextRestType);
 goalInput.value = todayData.dailyGoal;
 applyTheme(todayData.theme);
 render();
-switchPage("timer");
+switchPage("home");
 setupAuthUI();
+setupAiSummaryUI();
 setupCloudStatsUI();
 setupStudyGoalsUI();
-setupAiSummaryUI();
 setupCurrentGoalUI();
 refreshAuthUI();
 bootstrapCloudSession();
@@ -174,9 +150,20 @@ bootstrapCloudSession();
 startBtn.addEventListener("click", startTimer);
 pauseBtn.addEventListener("click", pauseTimer);
 resetBtn.addEventListener("click", resetTimer);
+abandonBtn.addEventListener("click", resetTimer);
 clearRecordsBtn.addEventListener("click", clearTodayRecords);
+profileClearRecordsBtn?.addEventListener("click", clearTodayRecords);
 themeToggle.addEventListener("click", toggleTheme);
+profileThemeBtn?.addEventListener("click", toggleTheme);
+homeFocusBtn.addEventListener("click", startNextHomeFocus);
+homeAddTaskBtn.addEventListener("click", () => {
+  switchPage("tasks");
+  newTaskInput.focus();
+});
+homeInsightsBtn?.addEventListener("click", () => switchPage("insights"));
+profileInsightsBtn?.addEventListener("click", () => switchPage("insights"));
 focusDurationInput.addEventListener("change", updateFocusDuration);
+restDurationSelect.addEventListener("change", updateRestDuration);
 currentTaskSelect.addEventListener("change", updateCurrentTaskSelection);
 addTaskBtn.addEventListener("click", handleAddTask);
 newTaskInput.addEventListener("keydown", handleNewTaskKeydown);
@@ -217,9 +204,9 @@ if ("serviceWorker" in navigator) {
 }
 
 function setupAuthUI() {
-  const hero = document.querySelector(".hero");
+  const mount = document.querySelector("#accountMount") || document.querySelector(".hero");
 
-  if (!hero) {
+  if (!mount) {
     return;
   }
 
@@ -251,7 +238,7 @@ function setupAuthUI() {
     </div>
   `;
 
-  hero.appendChild(authPanel);
+  mount.appendChild(authPanel);
   authForm = authPanel.querySelector("#accountForm");
   syncStatus = authPanel.querySelector("#syncStatus");
   manualSyncButton = authPanel.querySelector("#manualSyncBtn");
@@ -432,47 +419,6 @@ function saveAuthSession() {
   }
 }
 
-async function apiRequest(path, options = {}) {
-  const headers = {
-    "Content-Type": "application/json",
-    ...(options.headers || {})
-  };
-
-  if (!options.skipAuth && authSession?.token) {
-    headers.Authorization = `Bearer ${authSession.token}`;
-  }
-
-  const response = await fetch(path, {
-    method: options.method || "GET",
-    headers,
-    body: options.body ? JSON.stringify(options.body) : undefined
-  });
-
-  if (!response.ok) {
-    let message = "请求失败";
-    let code = "";
-
-    try {
-      const payload = await response.json();
-      message = payload.error || message;
-      code = payload.code || "";
-    } catch (error) {
-      message = response.statusText || message;
-    }
-
-    const requestError = new Error(message);
-    requestError.status = response.status;
-    requestError.code = code;
-    throw requestError;
-  }
-
-  if (response.status === 204) {
-    return null;
-  }
-
-  return response.json();
-}
-
 function isCloudSyncEnabled() {
   return Boolean(authSession?.token);
 }
@@ -547,9 +493,9 @@ function formatLastSyncTime(value) {
 }
 
 function setupCloudStatsUI() {
-  const trendsPage = document.querySelector('.app-page[data-page="trends"]');
+  const insightsPage = document.querySelector('.app-page[data-page="insights"]');
 
-  if (!trendsPage) {
+  if (!insightsPage) {
     return;
   }
 
@@ -579,7 +525,7 @@ function setupCloudStatsUI() {
     </div>
   `;
 
-  trendsPage.appendChild(cloudStatsPanel);
+  insightsPage.appendChild(cloudStatsPanel);
   cloudStatsPanel.querySelectorAll("[data-stats-range]").forEach((button) => {
     button.addEventListener("click", () => fetchCloudStats(button.dataset.statsRange));
   });
@@ -692,15 +638,6 @@ function buildLocalStatsSummary() {
   `;
 }
 
-function renderCloudStatMetric(value, label) {
-  return `
-    <article class="cloud-stat-metric">
-      <strong>${Number(value) || 0}</strong>
-      <span>${label}</span>
-    </article>
-  `;
-}
-
 function renderCloudStatsChart(container, days) {
   container.innerHTML = "";
 
@@ -767,9 +704,9 @@ function formatStatsDateLabel(value) {
 }
 
 function setupAiSummaryUI() {
-  const reviewPage = document.querySelector('.app-page[data-page="review"]');
+  const insightsPage = document.querySelector('.app-page[data-page="insights"]');
 
-  if (!reviewPage) {
+  if (!insightsPage) {
     return;
   }
 
@@ -787,7 +724,7 @@ function setupAiSummaryUI() {
     <div class="ai-summary-body" id="aiSummaryBody"></div>
   `;
 
-  reviewPage.appendChild(aiSummaryPanel);
+  insightsPage.appendChild(aiSummaryPanel);
   aiSummaryPanel.querySelector("#aiSummaryGenerate").addEventListener("click", () => fetchDailyAiSummary());
   renderAiSummary();
 }
@@ -883,26 +820,67 @@ function renderAiSummary() {
       <h3>${escapeHtml(aiSummary.data.title)}</h3>
       <p>${escapeHtml(aiSummary.data.todaySummary)}</p>
     </article>
-    ${renderAiSummaryList("亮点", aiSummary.data.highlights)}
-    ${renderAiSummaryList("风险提醒", aiSummary.data.risks)}
-    ${renderAiSummaryList("明日建议", aiSummary.data.tomorrowPlan)}
+    ${renderAiSummaryList("亮点", aiSummary.data.highlights, escapeHtml)}
+    ${renderAiSummaryList("风险提醒", aiSummary.data.risks, escapeHtml)}
+    ${renderAiSummaryList("明日建议", aiSummary.data.tomorrowPlan, escapeHtml)}
     <blockquote class="ai-summary-encouragement">${escapeHtml(aiSummary.data.encouragement)}</blockquote>
+    <button class="secondary-btn ai-summary-adopt" id="aiSummaryAdoptBtn" type="button">采纳明日建议为任务</button>
   `;
+
+  body.querySelector("#aiSummaryAdoptBtn")?.addEventListener("click", adoptAiTomorrowPlan);
 }
 
-function renderAiSummaryList(title, items) {
-  if (!Array.isArray(items) || items.length === 0) {
-    return "";
+function adoptAiTomorrowPlan() {
+  const suggestions = Array.isArray(aiSummary.data?.tomorrowPlan)
+    ? aiSummary.data.tomorrowPlan.map((item) => String(item).trim()).filter(Boolean)
+    : [];
+
+  if (suggestions.length === 0) {
+    showTaskToast("AI 还没有给出可采纳的明日建议。");
+    return;
   }
 
-  return `
-    <section class="ai-summary-section">
-      <strong>${title}</strong>
-      <ul>
-        ${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
-      </ul>
-    </section>
-  `;
+  const tomorrowKey = getTomorrowKey();
+  const tomorrowTasks = Array.isArray(dailyPlans[tomorrowKey]) ? dailyPlans[tomorrowKey] : [];
+  const existingTitles = new Set(tomorrowTasks.map((task) => task.title.trim().toLowerCase()));
+  const createdAt = new Date().toISOString();
+  let addedCount = 0;
+
+  suggestions.forEach((suggestion) => {
+    const title = suggestion.slice(0, 60);
+    const titleKey = title.toLowerCase();
+
+    if (existingTitles.has(titleKey)) {
+      return;
+    }
+
+    const task = normalizeTask({
+      id: createTaskId(),
+      clientId: "",
+      title,
+      completed: false,
+      createdAt
+    });
+
+    if (!task) {
+      return;
+    }
+
+    tomorrowTasks.push(task);
+    existingTitles.add(titleKey);
+    addedCount += 1;
+  });
+
+  dailyPlans[tomorrowKey] = tomorrowTasks;
+  saveDailyPlans();
+
+  if (addedCount === 0) {
+    showTaskToast("明日任务里已经有这些建议了。");
+    return;
+  }
+
+  showTaskToast(`已采纳 ${addedCount} 条建议，加入明日任务。`);
+  runCloudSync(uploadLocalTasksToCloud);
 }
 
 function formatAiGeneratedAt(value) {
@@ -921,9 +899,9 @@ function formatAiGeneratedAt(value) {
 }
 
 function setupStudyGoalsUI() {
-  const goalsPage = document.querySelector('.app-page[data-page="goals"]');
+  const insightsPage = document.querySelector('.app-page[data-page="insights"]');
 
-  if (!goalsPage) {
+  if (!insightsPage) {
     return;
   }
 
@@ -946,7 +924,7 @@ function setupStudyGoalsUI() {
     <ul class="study-goal-list" id="studyGoalList"></ul>
   `;
 
-  goalsPage.appendChild(studyGoalsPanel);
+  insightsPage.appendChild(studyGoalsPanel);
   studyGoalsPanel.querySelector("#studyGoalForm").addEventListener("submit", handleStudyGoalSubmit);
   renderStudyGoals();
 }
@@ -1116,9 +1094,9 @@ function formatStudyGoalMeta(goal) {
 }
 
 function setupCurrentGoalUI() {
-  const currentTaskSetting = document.querySelector(".current-task-setting");
+  const settingsBody = document.querySelector(".focus-round-settings-body");
 
-  if (!currentTaskSetting) {
+  if (!settingsBody) {
     return;
   }
 
@@ -1128,10 +1106,36 @@ function setupCurrentGoalUI() {
     <label for="currentGoalSelect">当前目标</label>
     <select id="currentGoalSelect" aria-label="选择当前学习目标"></select>
   `;
-  currentTaskSetting.insertAdjacentElement("afterend", wrapper);
+  settingsBody.appendChild(wrapper);
   currentGoalSelect = wrapper.querySelector("#currentGoalSelect");
   currentGoalSelect.addEventListener("change", updateCurrentGoalSelection);
   updateCurrentGoalOptions();
+}
+
+function startNextHomeFocus() {
+  const nextTask = getTodayTasks().find((task) => !task.completed);
+
+  if (nextTask) {
+    focusTask(nextTask.id);
+    return;
+  }
+
+  switchPage("focus");
+}
+
+function focusTask(taskId) {
+  const task = getTodayTasks().find((item) => item.id === taskId);
+
+  if (task && !task.completed) {
+    todayData.currentTaskId = task.id;
+    todayData.currentTask = task.title;
+    saveTodayData();
+    updateCurrentTaskOptions();
+    renderHomePage();
+    runCloudSync(syncSettingsToCloud);
+  }
+
+  switchPage("focus");
 }
 
 async function pullCloudState() {
@@ -1340,6 +1344,7 @@ function applyCloudSettings(settings) {
   }
 
   focusDurationInput.value = todayData.focusDuration;
+  restDurationSelect.value = todayData.nextRestType;
   goalInput.value = todayData.dailyGoal;
   applyTheme(todayData.theme);
   saveTodayData(false);
@@ -1584,6 +1589,18 @@ function updateFocusDuration() {
   render();
 }
 
+function updateRestDuration() {
+  setRestType(restDurationSelect.value);
+  saveTodayData();
+
+  if (currentMode === "rest" && timerId === null) {
+    remainingSeconds = MODES.rest.minutes * 60;
+  }
+
+  render();
+  runCloudSync(syncSettingsToCloud);
+}
+
 function getTodayKey() {
   return getDateKey();
 }
@@ -1591,6 +1608,16 @@ function getTodayKey() {
 function getYesterdayKey() {
   const date = new Date();
   date.setDate(date.getDate() - 1);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function getTomorrowKey() {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
@@ -1786,6 +1813,11 @@ function editTask(taskId, newTitle) {
 function deleteTask(taskId) {
   const tasks = getTodayTasks();
   const task = tasks.find((item) => item.id === taskId);
+
+  if (!task || !window.confirm(`确定删除任务「${task.title}」吗？`)) {
+    return;
+  }
+
   const nextTasks = tasks.filter((task) => task.id !== taskId);
 
   dailyPlans[getTodayKey()] = nextTasks;
@@ -1852,26 +1884,16 @@ function carryOverYesterdayTasks() {
 
 function renderTaskPage() {
   const tasks = getTodayTasks();
-  const completedCount = tasks.filter((task) => task.completed).length;
-  const sortedTasks = [...tasks].sort((a, b) => Number(a.completed) - Number(b.completed));
-
-  todayDateText.textContent = formatPlanDate(new Date());
-  planProgressText.textContent = `已完成 ${completedCount} / ${tasks.length}`;
   renderCarryOverBanner();
-  taskList.innerHTML = "";
-
-  if (sortedTasks.length === 0) {
-    const emptyItem = document.createElement("li");
-    emptyItem.className = "empty-record";
-    emptyItem.textContent = "暂无任务，先添加一个今天要做的事。";
-    taskList.appendChild(emptyItem);
-    return;
-  }
-
-  sortedTasks.forEach((task) => {
-    const item = renderTaskCard(task);
-
-    taskList.appendChild(item);
+  renderTasksPageView({
+    elements: {
+      todayDateText,
+      planProgressText,
+      taskList
+    },
+    tasks,
+    renderTaskCard,
+    formatPlanDate
   });
 }
 
@@ -1882,26 +1904,7 @@ function renderTaskCard(task) {
   item.className = "plan-task-item";
   item.dataset.completed = String(task.completed);
   item.dataset.taskId = task.id;
-  item.innerHTML = `
-    <div class="task-complete-underlay" aria-hidden="true">
-      <span>✓</span>
-      <strong>右滑完成</strong>
-    </div>
-    <div class="task-card-front">
-      <span class="task-swipe-cue" aria-hidden="true">${task.completed ? "✓" : "→"}</span>
-      <button class="task-title-btn" type="button" data-action="edit" data-task-id="${task.id}">
-        <span class="task-title">${escapeHtml(task.title)}</span>
-      </button>
-      <div class="task-meta-actions">
-        ${task.completed ? `<span class="task-completed-time">${completedTime} 完成</span>` : `<span class="task-swipe-hint">右滑</span>`}
-        <div class="task-actions">
-          ${task.completed ? `<button class="task-action-btn" type="button" data-action="restore" data-task-id="${task.id}">恢复</button>` : `<button class="task-action-btn" type="button" data-action="edit" data-task-id="${task.id}">编辑</button>`}
-          <button class="task-action-btn task-delete-btn" type="button" data-action="delete" data-task-id="${task.id}">删除</button>
-        </div>
-      </div>
-      <span class="task-done-badge">完成！</span>
-    </div>
-  `;
+  item.innerHTML = buildTaskCardHtml({ task, completedTime, escapeHtml });
 
   if (task.id === recentlyCompletedTaskId) {
     item.classList.add("just-completed");
@@ -1916,11 +1919,34 @@ function renderTaskCard(task) {
   item.querySelectorAll('[data-action="edit"]').forEach((button) => {
     button.addEventListener("click", (event) => startTaskEdit(task.id, event.currentTarget));
   });
-  item.querySelector('[data-action="delete"]').addEventListener("click", () => deleteTask(task.id));
+  item.querySelectorAll('[data-action="delete"]').forEach((button) => {
+    button.addEventListener("click", () => deleteTask(task.id));
+  });
 
   if (task.completed) {
     item.querySelector('[data-action="restore"]').addEventListener("click", () => undoCompleteTask(task.id));
   } else {
+    const front = item.querySelector(".task-card-front");
+
+    front.addEventListener("click", (event) => {
+      if (front.dataset.ignoreClick === "true" || event.target.closest("button, summary, details")) {
+        return;
+      }
+
+      focusTask(task.id);
+    });
+    front.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") {
+        return;
+      }
+
+      if (event.target.closest("button, summary, details")) {
+        return;
+      }
+
+      event.preventDefault();
+      focusTask(task.id);
+    });
     initSwipeTaskCard(item, task);
   }
 
@@ -1980,7 +2006,7 @@ function initSwipeTaskCard(cardElement, task) {
 }
 
 function handleTaskPointerDown(event, task, cardElement) {
-  if (task.completed || event.target.closest("button")) {
+  if (task.completed || event.target.closest("button, summary, details")) {
     return;
   }
 
@@ -2050,6 +2076,13 @@ function handleTaskPointerUp(event, task) {
     resetSwipeCard(swipe);
   }
 
+  if (swipe.isDragging) {
+    swipe.front.dataset.ignoreClick = "true";
+    window.setTimeout(() => {
+      delete swipe.front.dataset.ignoreClick;
+    }, 220);
+  }
+
   activeSwipe = null;
 }
 
@@ -2094,6 +2127,7 @@ function completeTaskWithAnimation(taskId) {
   task.completed = true;
   task.completedAt = new Date().toISOString();
   recentlyCompletedTaskId = task.id;
+  const xpResult = addPetXP(10);
   vibrateTaskDone();
 
   if (todayData.currentTaskId === task.id) {
@@ -2103,10 +2137,16 @@ function completeTaskWithAnimation(taskId) {
   }
 
   saveDailyPlans();
+  saveTodayData();
   renderTaskPage();
   updateCurrentTaskOptions();
-  runCloudSync(() => syncTaskPatch(task, { completed: true }));
-  showTaskToast(`已完成：${task.title}`, () => undoCompleteTask(task.id));
+  updatePetUI();
+  renderHomePage();
+  runCloudSync(async () => {
+    await syncTaskPatch(task, { completed: true });
+    await syncPetToCloud();
+  });
+  showTaskToast(`任务完成！宠物获得 +${xpResult.totalXP} XP`, () => undoCompleteTask(task.id));
 }
 
 function undoCompleteTask(taskId) {
@@ -2129,6 +2169,7 @@ function undoCompleteTask(taskId) {
 function showTaskToast(message, undoCallback) {
   taskToastText.textContent = message;
   taskToastUndoCallback = undoCallback;
+  taskToastUndo.hidden = typeof undoCallback !== "function";
   taskToast.setAttribute("aria-hidden", "false");
 
   window.clearTimeout(taskToastTimer);
@@ -2138,6 +2179,7 @@ function showTaskToast(message, undoCallback) {
 function hideTaskToast() {
   taskToast.setAttribute("aria-hidden", "true");
   taskToastUndoCallback = null;
+  taskToastUndo.hidden = false;
   window.clearTimeout(taskToastTimer);
 }
 
@@ -2303,17 +2345,23 @@ function formatTaskCompletedTime(completedAt) {
 }
 
 function switchPage(pageName) {
+  const navPageName = pageName === "insights" ? "profile" : pageName;
+
+  document.body.dataset.page = pageName;
+
   appPages.forEach((page) => {
     page.classList.toggle("active", page.dataset.page === pageName);
   });
 
   pageButtons.forEach((button) => {
-    const isActive = button.dataset.pageTarget === pageName;
+    const isActive = button.dataset.pageTarget === navPageName;
     button.classList.toggle("active", isActive);
     button.setAttribute("aria-current", isActive ? "page" : "false");
   });
 
-  if (pageName === "trends" && isCloudSyncEnabled() && cloudStats.status === "idle") {
+  window.scrollTo({ top: 0, behavior: "smooth" });
+
+  if (pageName === "insights" && isCloudSyncEnabled() && cloudStats.status === "idle") {
     fetchCloudStats(cloudStats.range);
   }
 }
@@ -2437,6 +2485,7 @@ function clearTodayRecords() {
   todayData.focusMinutes = 0;
   todayData.streak = 0;
   todayData.records = [];
+  todayData.todayPetXP = 0;
   todayData.nextRestType = "short";
   MODES.rest.minutes = REST_DURATIONS.short;
   saveTodayData();
@@ -2466,6 +2515,7 @@ function loadTodayData() {
     nextRestType: "short",
     theme: "light",
     records: [],
+    todayPetXP: 0,
     selectedPet: defaultPetType,
     petProgress: createPetProgress(defaultPetType)
   };
@@ -2506,6 +2556,7 @@ function loadTodayData() {
       nextRestType: normalizeRestType(saved.nextRestType),
       theme: saved.theme === "dark" ? "dark" : "light",
       records: Array.isArray(saved.records) ? saved.records.map(normalizeFocusRecord).filter(Boolean) : [],
+      todayPetXP: normalizeTodayPetXP(saved.todayPetXP ?? inferTodayPetXP(saved.records), petProgress.totalXP),
       selectedPet,
       petProgress
     };
@@ -2570,7 +2621,23 @@ function normalizeFocusRecord(record) {
   };
 }
 
+function inferTodayPetXP(records) {
+  if (!Array.isArray(records)) {
+    return 0;
+  }
+
+  return records.reduce((total, record) => total + normalizeNonNegativeInteger(record?.xpEarned), 0);
+}
+
+function normalizeTodayPetXP(value, totalXP = todayData?.petProgress?.totalXP ?? 0) {
+  return Math.min(
+    normalizeNonNegativeInteger(value),
+    normalizeNonNegativeInteger(totalXP)
+  );
+}
+
 function render() {
+  renderHomePage();
   renderModePanels();
   renderTimerAndProgress();
   renderModeButtons();
@@ -2584,6 +2651,30 @@ function render() {
   renderRecords();
   renderPetPicker();
   updatePetUI();
+}
+
+function renderHomePage() {
+  const tasks = getTodayTasks();
+  const progress = todayData.petProgress || createPetProgress(todayData.selectedPet);
+  const petType = PET_TYPES[normalizePetType(progress.petId || todayData.selectedPet)];
+
+  renderHomePageView({
+    elements: {
+      homeDateText,
+      homeTaskProgress,
+      homeFocusMinutes,
+      homeGoalProgress,
+      homeStreakText,
+      homePetChip,
+      homeNextTaskTitle,
+      homeNextTaskHint
+    },
+    tasks,
+    todayData,
+    petName: petType.name,
+    petLevel: progress.level,
+    formatPlanDate
+  });
 }
 
 function renderModePanels() {
@@ -2604,19 +2695,15 @@ function renderTimerAndProgress() {
 function renderModeButtons() {
   modeButtons.forEach((button) => {
     if (button.dataset.mode === "focus") {
-      button.textContent = `专注 ${MODES.focus.minutes}`;
+      button.textContent = "专注";
     }
 
     if (button.dataset.mode === "rest") {
-      button.textContent = `休息 ${MODES.rest.minutes}`;
+      button.textContent = "休息";
     }
 
     button.classList.toggle("active", button.dataset.mode === currentMode);
   });
-
-  subtitle.textContent = currentMode === "rest"
-    ? "暂停追赶，给大脑一点恢复的风。"
-    : `专注 ${MODES.focus.minutes} 分钟，休息一下，再回来继续。`;
 }
 
 function renderRestPanel() {
@@ -2694,6 +2781,7 @@ function updatePetUI() {
   const petType = PET_TYPES[normalizePetType(progress.petId || todayData.selectedPet)];
   const evolutionStage = getEvolutionStage(progress.level);
   const xpPercent = Math.min(100, Math.round((progress.currentXP / progress.nextLevelXP) * 100));
+  const todayXP = normalizeTodayPetXP(todayData.todayPetXP ?? inferTodayPetXP(todayData.records), progress.totalXP);
 
   petShell.dataset.stage = evolutionStage.state;
   petArt.innerHTML = renderPetImage(petType === undefined ? todayData.selectedPet : progress.petId, evolutionStage.id);
@@ -2702,8 +2790,9 @@ function updatePetUI() {
   petLevelLabel.textContent = `Lv.${progress.level}`;
   petStatus.textContent = getPetDescription();
   petProgressFill.style.width = `${xpPercent}%`;
-  petXPText.textContent = `${progress.currentXP} / ${progress.nextLevelXP} XP`;
+  petXPText.textContent = `当前 ${progress.currentXP} / ${progress.nextLevelXP} XP`;
   evolutionHint.textContent = getEvolutionHint(progress.level);
+  petTodayXP.textContent = `今日 ${todayXP} XP`;
   streakCount.textContent = `今日连续 ${todayData.streak}`;
   petTotalXP.textContent = `累计 ${progress.totalXP} XP`;
 }
@@ -2746,6 +2835,7 @@ function selectPetType(typeKey) {
   const normalizedType = normalizePetType(typeKey);
   todayData.selectedPet = normalizedType;
   todayData.petProgress = createPetProgress(normalizedType);
+  todayData.todayPetXP = 0;
   saveTodayData();
   renderPetPicker();
   updatePetUI();
@@ -2762,6 +2852,16 @@ function getPetDescription() {
 
 function getNextLevelXP(level) {
   return 100 + (level - 1) * 50;
+}
+
+function getCumulativeXPForLevel(level) {
+  let total = 0;
+
+  for (let currentLevel = 1; currentLevel < level; currentLevel += 1) {
+    total += getNextLevelXP(currentLevel);
+  }
+
+  return total;
 }
 
 function getEvolutionStage(level) {
@@ -2788,6 +2888,7 @@ function addPetXP(amount) {
 
   progress.currentXP += totalXP;
   progress.totalXP += totalXP;
+  todayData.todayPetXP = normalizeNonNegativeInteger(todayData.todayPetXP) + totalXP;
 
   const levelsGained = checkLevelUp();
   const nextStage = getEvolutionStage(progress.level).id;
@@ -2900,10 +3001,18 @@ function loadPetProgress(saved, fallbackPetId = PET_TYPE_KEYS[0]) {
 
 function normalizePetProgress(progress, fallbackPetId = PET_TYPE_KEYS[0]) {
   const petId = normalizePetType(progress.petId || fallbackPetId);
-  const level = Math.max(1, Math.floor(Number(progress.level) || 1));
-  const nextLevelXP = getNextLevelXP(level);
-  const currentXP = Math.max(0, Math.min(Math.floor(Number(progress.currentXP) || 0), nextLevelXP - 1));
-  const totalXP = Math.max(currentXP, Math.floor(Number(progress.totalXP) || currentXP));
+  let level = Math.max(1, Math.floor(Number(progress.level) || 1));
+  let currentXP = Math.max(0, Math.floor(Number(progress.currentXP) || 0));
+  let nextLevelXP = getNextLevelXP(level);
+
+  while (currentXP >= nextLevelXP) {
+    currentXP -= nextLevelXP;
+    level += 1;
+    nextLevelXP = getNextLevelXP(level);
+  }
+
+  const minimumTotalXP = getCumulativeXPForLevel(level) + currentXP;
+  const totalXP = Math.max(minimumTotalXP, Math.floor(Number(progress.totalXP) || 0));
   const evolutionStage = getEvolutionStage(level).id;
 
   return {
