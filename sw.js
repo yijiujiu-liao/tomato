@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaoyan-pomodoro-v26";
+const CACHE_NAME = "kaoyan-pomodoro-v38";
 const ASSETS = [
   "./",
   "./index.html",
@@ -6,7 +6,9 @@ const ASSETS = [
   "./script.js",
   "./js/state.js",
   "./js/api.js",
+  "./js/timer.js",
   "./js/components/aiSummary.js",
+  "./js/components/diagnostics.js",
   "./js/components/stats.js",
   "./js/components/taskCard.js",
   "./js/pages/home.js",

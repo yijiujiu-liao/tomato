@@ -1,4 +1,6 @@
 import express from "express";
+import { createHash } from "node:crypto";
+import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { config } from "./config.js";
 import {
@@ -22,16 +24,40 @@ import {
 export const app = express();
 const port = config.port;
 const publicDir = config.publicDir;
+const authRateLimit = createRateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
+const aiRateLimit = createRateLimit({
+  windowMs: 24 * 60 * 60 * 1000,
+  max: 24,
+  key: (req) => req.auth?.user?.id || req.ip
+});
 
+app.disable("x-powered-by");
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'");
+  next();
+});
 app.use(express.json({ limit: "1mb" }));
-app.use(express.static(publicDir, {
+const staticOptions = {
   extensions: ["html"],
   setHeaders(res, filePath) {
     if (filePath.endsWith("sw.js")) {
       res.setHeader("Cache-Control", "no-cache");
     }
   }
-}));
+};
+
+app.use("/js", express.static(join(publicDir, "js"), staticOptions));
+app.use("/assets", express.static(join(publicDir, "assets"), staticOptions));
+
+for (const asset of ["style.css", "script.js", "sw.js", "manifest.json", "icon-192.png", "icon-512.png", "icon.svg"]) {
+  app.get(`/${asset}`, (req, res) => res.sendFile(join(publicDir, asset)));
+}
+
+app.get(["/", "/index.html"], (req, res) => res.sendFile(join(publicDir, "index.html")));
 
 app.get("/api/health", (req, res) => {
   res.json({
@@ -52,7 +78,7 @@ app.get("/api/ready", (req, res, next) => {
   }
 });
 
-app.post("/api/auth/register", (req, res, next) => {
+app.post("/api/auth/register", authRateLimit, (req, res, next) => {
   try {
     const user = createUser(req.body || {});
     const session = createSession(user.id);
@@ -63,7 +89,7 @@ app.post("/api/auth/register", (req, res, next) => {
   }
 });
 
-app.post("/api/auth/login", (req, res, next) => {
+app.post("/api/auth/login", authRateLimit, (req, res, next) => {
   try {
     const userWithPassword = getUserByEmail(req.body?.email);
 
@@ -127,6 +153,7 @@ app.get("/api/sync", requireAuth, (req, res) => {
       study_goal_id AS studyGoalId,
       task_title AS taskTitle,
       mode,
+      date_key AS dateKey,
       minutes,
       started_at AS startedAt,
       ended_at AS endedAt,
@@ -255,6 +282,11 @@ app.post("/api/tasks", requireAuth, (req, res) => {
   }
 
   const clientId = normalizeOptionalString(req.body?.clientId, 120);
+  const source = normalizeTaskSource(req.body?.source);
+  const sourceLabel = source ? normalizeOptionalString(req.body?.sourceLabel, 24) : null;
+  const sourceDateKey = source ? normalizeOptionalDateKey(req.body?.sourceDateKey) : null;
+  const suggestedForDate = source ? normalizeOptionalDateKey(req.body?.suggestedForDate) : null;
+  const aiGeneratedAt = source ? normalizeOptionalString(req.body?.aiGeneratedAt, 40) : null;
 
   if (clientId) {
     const existing = db.prepare(`
@@ -263,6 +295,31 @@ app.post("/api/tasks", requireAuth, (req, res) => {
     `).get(req.auth.user.id, clientId);
 
     if (existing) {
+      if (source && !existing.source) {
+        db.prepare(`
+          UPDATE tasks
+          SET source = ?,
+              source_label = ?,
+              source_date_key = ?,
+              suggested_for_date = ?,
+              ai_generated_at = ?,
+              updated_at = ?
+          WHERE id = ? AND user_id = ?
+        `).run(
+          source,
+          sourceLabel,
+          sourceDateKey,
+          suggestedForDate,
+          aiGeneratedAt,
+          nowIso(),
+          existing.id,
+          req.auth.user.id
+        );
+        const updatedTask = db.prepare("SELECT * FROM tasks WHERE id = ? AND user_id = ?").get(existing.id, req.auth.user.id);
+        res.json({ task: taskFromRow(updatedTask) });
+        return;
+      }
+
       res.json({ task: taskFromRow(existing) });
       return;
     }
@@ -280,6 +337,11 @@ app.post("/api/tasks", requireAuth, (req, res) => {
     createdAt,
     completedAt: completed ? createdAt : null,
     carriedFromId: req.body?.carriedFromId || null,
+    source,
+    sourceLabel,
+    sourceDateKey,
+    suggestedForDate,
+    aiGeneratedAt,
     updatedAt: nowIso()
   };
 
@@ -294,9 +356,14 @@ app.post("/api/tasks", requireAuth, (req, res) => {
       created_at,
       completed_at,
       carried_from_id,
+      source,
+      source_label,
+      source_date_key,
+      suggested_for_date,
+      ai_generated_at,
       updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     task.id,
     task.userId,
@@ -307,6 +374,11 @@ app.post("/api/tasks", requireAuth, (req, res) => {
     task.createdAt,
     task.completedAt,
     task.carriedFromId,
+    task.source,
+    task.sourceLabel,
+    task.sourceDateKey,
+    task.suggestedForDate,
+    task.aiGeneratedAt,
     task.updatedAt
   );
 
@@ -508,6 +580,7 @@ app.post("/api/focus-sessions", requireAuth, (req, res) => {
   const streak = Math.max(0, Math.floor(Number(req.body?.streak || 0)));
   const xpEarned = Math.max(0, Math.floor(Number(req.body?.xpEarned || minutes)));
   const clientId = normalizeOptionalString(req.body?.clientId, 120);
+  const dateKey = normalizeDateKey(req.body?.dateKey || endedAt.slice(0, 10));
 
   if (clientId) {
     const existing = db.prepare(`
@@ -518,6 +591,7 @@ app.post("/api/focus-sessions", requireAuth, (req, res) => {
         study_goal_id AS studyGoalId,
         task_title AS taskTitle,
         mode,
+        date_key AS dateKey,
         minutes,
         started_at AS startedAt,
         ended_at AS endedAt,
@@ -542,6 +616,7 @@ app.post("/api/focus-sessions", requireAuth, (req, res) => {
     studyGoalId,
     taskTitle,
     mode: req.body?.mode === "rest" ? "rest" : "focus",
+    dateKey,
     minutes,
     startedAt,
     endedAt,
@@ -559,6 +634,7 @@ app.post("/api/focus-sessions", requireAuth, (req, res) => {
       study_goal_id,
       task_title,
       mode,
+      date_key,
       minutes,
       started_at,
       ended_at,
@@ -566,7 +642,7 @@ app.post("/api/focus-sessions", requireAuth, (req, res) => {
       xp_earned,
       created_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     session.id,
     session.userId,
@@ -575,6 +651,7 @@ app.post("/api/focus-sessions", requireAuth, (req, res) => {
     session.studyGoalId,
     session.taskTitle,
     session.mode,
+    session.dateKey,
     session.minutes,
     session.startedAt,
     session.endedAt,
@@ -591,6 +668,7 @@ app.post("/api/focus-sessions", requireAuth, (req, res) => {
       studyGoalId: session.studyGoalId,
       taskTitle: session.taskTitle,
       mode: session.mode,
+      dateKey: session.dateKey,
       minutes: session.minutes,
       startedAt: session.startedAt,
       endedAt: session.endedAt,
@@ -607,15 +685,15 @@ app.get("/api/stats", requireAuth, (req, res) => {
   const endDate = new Date();
   const rows = db.prepare(`
     SELECT
-      date(ended_at, 'localtime') AS date,
+      date_key AS date,
       COUNT(*) AS completedCount,
       COALESCE(SUM(minutes), 0) AS focusMinutes,
       COALESCE(SUM(xp_earned), 0) AS xpEarned
     FROM focus_sessions
-    WHERE user_id = ? AND mode = 'focus' AND ended_at >= ?
-    GROUP BY date(ended_at, 'localtime')
+    WHERE user_id = ? AND mode = 'focus' AND date_key >= ?
+    GROUP BY date_key
     ORDER BY date ASC
-  `).all(req.auth.user.id, startDate.toISOString());
+  `).all(req.auth.user.id, formatDateKey(startDate));
   const days = buildStatsDays(startDate, endDate, rows);
   const totals = days.reduce((summary, row) => {
     summary.completedCount += row.completedCount;
@@ -635,8 +713,36 @@ app.get("/api/stats", requireAuth, (req, res) => {
   });
 });
 
-app.post("/api/ai/daily-summary", requireAuth, async (req, res, next) => {
+app.get("/api/ai/daily-summary", requireAuth, (req, res, next) => {
   try {
+    const dateKey = normalizeDateKey(req.query.dateKey);
+    const stored = getStoredDailySummary(req.auth.user.id, dateKey);
+
+    if (!stored) {
+      res.status(404).json({ code: "AI_SUMMARY_NOT_FOUND", error: "这一天还没有生成 AI 复盘。" });
+      return;
+    }
+
+    res.json(stored);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/ai/daily-summary", requireAuth, aiRateLimit, async (req, res, next) => {
+  try {
+    const dateKey = normalizeDateKey(req.body?.dateKey);
+    const context = buildDailySummaryContext(req.auth.user.id, dateKey);
+    const sourceFingerprint = createHash("sha256").update(JSON.stringify(context)).digest("hex");
+    const stored = getStoredDailySummary(req.auth.user.id, dateKey);
+    const force = req.body?.force === true;
+    const cacheIsFresh = stored && Date.now() - new Date(stored.generatedAt).getTime() < 2 * 60 * 60 * 1000;
+
+    if (stored && !force && (stored.sourceFingerprint === sourceFingerprint || cacheIsFresh)) {
+      res.json({ ...stored, cached: true });
+      return;
+    }
+
     if (!getAiApiKey()) {
       res.status(503).json({
         code: "AI_NOT_CONFIGURED",
@@ -645,16 +751,41 @@ app.post("/api/ai/daily-summary", requireAuth, async (req, res, next) => {
       return;
     }
 
-    const dateKey = normalizeDateKey(req.body?.dateKey);
-    const context = buildDailySummaryContext(req.auth.user.id, dateKey);
     const summary = await generateDailySummary(context);
+    const generatedAt = nowIso();
+    const provider = config.aiProvider;
+    const model = getAiModel();
+
+    db.prepare(`
+      INSERT INTO ai_daily_summaries (
+        user_id, date_key, provider, model, summary_json, source_fingerprint, generated_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(user_id, date_key) DO UPDATE SET
+        provider = excluded.provider,
+        model = excluded.model,
+        summary_json = excluded.summary_json,
+        source_fingerprint = excluded.source_fingerprint,
+        generated_at = excluded.generated_at,
+        updated_at = excluded.updated_at
+    `).run(
+      req.auth.user.id,
+      dateKey,
+      provider,
+      model,
+      JSON.stringify(summary),
+      sourceFingerprint,
+      generatedAt,
+      generatedAt
+    );
 
     res.json({
       dateKey,
-      model: getAiModel(),
-      source: config.aiProvider,
-      generatedAt: nowIso(),
-      summary
+      model,
+      source: provider,
+      generatedAt,
+      sourceFingerprint,
+      summary,
+      cached: false
     });
   } catch (error) {
     next(error);
@@ -681,6 +812,56 @@ app.use((error, req, res, next) => {
     error: error.message || "服务器错误。"
   });
 });
+
+function createRateLimit({ windowMs, max, key = (req) => req.ip }) {
+  const buckets = new Map();
+
+  return (req, res, next) => {
+    const now = Date.now();
+    const bucketKey = String(key(req) || "unknown");
+    const current = buckets.get(bucketKey);
+    const bucket = !current || current.resetAt <= now
+      ? { count: 0, resetAt: now + windowMs }
+      : current;
+
+    bucket.count += 1;
+    buckets.set(bucketKey, bucket);
+
+    if (bucket.count > max) {
+      res.setHeader("Retry-After", String(Math.max(1, Math.ceil((bucket.resetAt - now) / 1000))));
+      res.status(429).json({ error: "请求过于频繁，请稍后再试。" });
+      return;
+    }
+
+    next();
+  };
+}
+
+function getStoredDailySummary(userId, dateKey) {
+  const row = db.prepare(`
+    SELECT provider, model, summary_json, source_fingerprint, generated_at
+    FROM ai_daily_summaries
+    WHERE user_id = ? AND date_key = ?
+  `).get(userId, dateKey);
+
+  if (!row) {
+    return null;
+  }
+
+  try {
+    return {
+      dateKey,
+      model: row.model,
+      source: row.provider,
+      generatedAt: row.generated_at,
+      sourceFingerprint: row.source_fingerprint,
+      summary: normalizeDailySummary(JSON.parse(row.summary_json))
+    };
+  } catch (error) {
+    db.prepare("DELETE FROM ai_daily_summaries WHERE user_id = ? AND date_key = ?").run(userId, dateKey);
+    return null;
+  }
+}
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   app.listen(port, () => {
@@ -730,6 +911,11 @@ function normalizeOptionalString(value, maxLength) {
   }
 
   return cleanValue.slice(0, maxLength);
+}
+
+function normalizeTaskSource(value) {
+  const cleanValue = String(value || "").trim();
+  return ["ai", "review", "delayed", "carry"].includes(cleanValue) ? cleanValue : null;
 }
 
 function normalizeOwnedStudyGoalId(userId, value) {
@@ -887,7 +1073,7 @@ function buildDailySummaryContext(userId, dateKey) {
     FROM focus_sessions
     WHERE user_id = ?
       AND mode = 'focus'
-      AND date(ended_at, 'localtime') = ?
+      AND date_key = ?
     ORDER BY ended_at ASC
   `).all(userId, dateKey).map((session) => ({
     taskTitle: session.taskTitle,
@@ -965,6 +1151,7 @@ async function generateDailySummary(context) {
 async function generateOpenAiDailySummary(context) {
   const response = await fetch(`${config.openaiBaseUrl.replace(/\/$/, "")}/responses`, {
     method: "POST",
+    signal: AbortSignal.timeout(30000),
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${config.openaiApiKey}`
@@ -1034,6 +1221,7 @@ async function generateOpenAiDailySummary(context) {
 async function generateDeepSeekDailySummary(context) {
   const response = await fetch(`${config.deepseekBaseUrl.replace(/\/$/, "")}/chat/completions`, {
     method: "POST",
+    signal: AbortSignal.timeout(30000),
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${config.deepseekApiKey}`
@@ -1137,6 +1325,11 @@ function toTaskRow(task) {
     created_at: task.createdAt,
     completed_at: task.completedAt,
     carried_from_id: task.carriedFromId,
+    source: task.source,
+    source_label: task.sourceLabel,
+    source_date_key: task.sourceDateKey,
+    suggested_for_date: task.suggestedForDate,
+    ai_generated_at: task.aiGeneratedAt,
     updated_at: task.updatedAt
   };
 }

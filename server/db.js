@@ -60,6 +60,11 @@ db.exec(`
     created_at TEXT NOT NULL,
     completed_at TEXT,
     carried_from_id TEXT,
+    source TEXT,
+    source_label TEXT,
+    source_date_key TEXT,
+    suggested_for_date TEXT,
+    ai_generated_at TEXT,
     updated_at TEXT NOT NULL
   );
 
@@ -88,6 +93,7 @@ db.exec(`
     study_goal_id TEXT REFERENCES study_goals(id) ON DELETE SET NULL,
     task_title TEXT NOT NULL,
     mode TEXT NOT NULL DEFAULT 'focus',
+    date_key TEXT,
     minutes INTEGER NOT NULL,
     started_at TEXT NOT NULL,
     ended_at TEXT NOT NULL,
@@ -97,6 +103,18 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_focus_sessions_user_end ON focus_sessions(user_id, ended_at);
+
+  CREATE TABLE IF NOT EXISTS ai_daily_summaries (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    date_key TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    summary_json TEXT NOT NULL,
+    source_fingerprint TEXT NOT NULL,
+    generated_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, date_key)
+  );
 `);
 
 const focusSessionColumns = db.prepare("PRAGMA table_info(focus_sessions)").all().map((column) => column.name);
@@ -111,12 +129,37 @@ if (!taskColumns.includes("client_id")) {
   db.exec("ALTER TABLE tasks ADD COLUMN client_id TEXT");
 }
 
+if (!taskColumns.includes("source")) {
+  db.exec("ALTER TABLE tasks ADD COLUMN source TEXT");
+}
+
+if (!taskColumns.includes("source_label")) {
+  db.exec("ALTER TABLE tasks ADD COLUMN source_label TEXT");
+}
+
+if (!taskColumns.includes("source_date_key")) {
+  db.exec("ALTER TABLE tasks ADD COLUMN source_date_key TEXT");
+}
+
+if (!taskColumns.includes("suggested_for_date")) {
+  db.exec("ALTER TABLE tasks ADD COLUMN suggested_for_date TEXT");
+}
+
+if (!taskColumns.includes("ai_generated_at")) {
+  db.exec("ALTER TABLE tasks ADD COLUMN ai_generated_at TEXT");
+}
+
 if (!focusSessionColumns.includes("client_id")) {
   db.exec("ALTER TABLE focus_sessions ADD COLUMN client_id TEXT");
 }
 
 if (!focusSessionColumns.includes("study_goal_id")) {
   db.exec("ALTER TABLE focus_sessions ADD COLUMN study_goal_id TEXT");
+}
+
+if (!focusSessionColumns.includes("date_key")) {
+  db.exec("ALTER TABLE focus_sessions ADD COLUMN date_key TEXT");
+  db.exec("UPDATE focus_sessions SET date_key = substr(ended_at, 1, 10) WHERE date_key IS NULL");
 }
 
 const studyGoalColumns = db.prepare("PRAGMA table_info(study_goals)").all().map((column) => column.name);
@@ -137,6 +180,9 @@ db.exec(`
   CREATE UNIQUE INDEX IF NOT EXISTS idx_study_goals_user_client
   ON study_goals(user_id, client_id)
   WHERE client_id IS NOT NULL;
+
+  CREATE INDEX IF NOT EXISTS idx_focus_sessions_user_date
+  ON focus_sessions(user_id, date_key);
 `);
 
 export function nowIso() {
@@ -191,6 +237,11 @@ export function taskFromRow(row) {
     createdAt: row.created_at,
     completedAt: row.completed_at,
     carriedFromId: row.carried_from_id,
+    source: row.source || "",
+    sourceLabel: row.source_label || "",
+    sourceDateKey: row.source_date_key || "",
+    suggestedForDate: row.suggested_for_date || "",
+    aiGeneratedAt: row.ai_generated_at || "",
     updatedAt: row.updated_at
   };
 }

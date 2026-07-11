@@ -13,6 +13,7 @@ export const STORAGE_KEY = "kaoyanPomodoroData";
 export const DAILY_PLANS_KEY = "kaoyanDailyPlans";
 export const AUTH_SESSION_KEY = "kaoyanPomodoroAuth";
 export const STUDY_GOALS_KEY = "kaoyanStudyGoals";
+export const DELETED_TASKS_KEY = "kaoyanDeletedCloudTasks";
 export const DEFAULT_GOAL = 8;
 export const DEFAULT_FOCUS_MINUTES = 50;
 export const MIN_FOCUS_MINUTES = 1;

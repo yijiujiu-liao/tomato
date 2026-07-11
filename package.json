@@ -6,9 +6,9 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
-    "check": "node --check script.js && node --check js/state.js && node --check js/api.js && node --check js/components/aiSummary.js && node --check js/components/stats.js && node --check js/components/taskCard.js && node --check js/pages/home.js && node --check js/pages/tasks.js && node --check server/config.js && node --check server/index.js && node --check server/db.js && node --check server/auth.js && node --check scripts/seed-demo-data.mjs && node --check tests/api.test.js",
+    "check": "node --check script.js && node --check js/state.js && node --check js/api.js && node --check js/timer.js && node --check js/components/aiSummary.js && node --check js/components/diagnostics.js && node --check js/components/stats.js && node --check js/components/taskCard.js && node --check js/pages/home.js && node --check js/pages/tasks.js && node --check server/config.js && node --check server/index.js && node --check server/db.js && node --check server/auth.js && node --check scripts/seed-demo-data.mjs && node --check tests/api.test.js && node --check tests/timer.test.js",
     "seed:demo": "node scripts/seed-demo-data.mjs",
-    "test": "node --test tests/api.test.js"
+    "test": "node --test"
   },
   "dependencies": {
     "express": "^5.1.0"

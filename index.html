@@ -10,57 +10,128 @@
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
-  <main class="app">
+<body class="auth-pending">
+  <section class="auth-gate" id="authGate" aria-labelledby="authGateTitle">
+    <div class="auth-gate-shell">
+      <div class="auth-gate-story">
+        <div class="auth-gate-brand">
+          <span class="auth-gate-mark">50</span>
+          <span>考研执行助手</span>
+        </div>
+        <div class="auth-gate-pet" aria-hidden="true">
+          <span class="auth-gate-orbit"></span>
+          <img src="assets/pets/penguin.webp" alt="">
+        </div>
+        <p class="auth-gate-kicker">PLAN · FOCUS · REVIEW</p>
+        <h1 id="authGateTitle">把今天学清楚，<br>也把明天接起来。</h1>
+        <p class="auth-gate-lead">任务计划、番茄专注、宠物成长和 AI 复盘，在同一条学习节奏里持续运转。</p>
+        <div class="auth-gate-benefits" aria-label="应用能力">
+          <span>跨设备同步</span>
+          <span>AI 明日建议</span>
+          <span>学习节奏诊断</span>
+        </div>
+      </div>
+
+      <div class="auth-gate-card">
+        <div class="auth-gate-tabs" aria-label="账号操作">
+          <button class="active" id="gateLoginTab" type="button" aria-pressed="true">登录</button>
+          <button id="gateRegisterTab" type="button" aria-pressed="false">注册</button>
+        </div>
+        <div class="auth-gate-heading">
+          <p id="authGateEyebrow">欢迎回来</p>
+          <h2 id="authGateHeading">继续今天的复习节奏</h2>
+        </div>
+        <form class="auth-gate-form" id="authGateForm">
+          <label>
+            <span>邮箱</span>
+            <input id="gateEmailInput" type="email" autocomplete="email" inputmode="email" placeholder="name@example.com" required>
+          </label>
+          <label>
+            <span>密码</span>
+            <input id="gatePasswordInput" type="password" autocomplete="current-password" minlength="8" placeholder="至少 8 位" required>
+          </label>
+          <label id="gateNameField" hidden>
+            <span>昵称</span>
+            <input id="gateNameInput" type="text" autocomplete="nickname" maxlength="30" placeholder="例如：上岸小番茄">
+          </label>
+          <button class="primary-btn auth-gate-submit" id="authGateSubmit" type="submit">登录并同步</button>
+          <p class="auth-gate-status" id="authGateStatus" role="status"></p>
+        </form>
+        <button class="auth-local-entry" id="authLocalEntry" type="button">先离线体验</button>
+        <p class="auth-gate-note">离线模式的数据只保存在这台设备，登录后可同步到其他设备。</p>
+      </div>
+    </div>
+  </section>
+
+  <main class="app" id="appRoot" aria-hidden="true" inert>
     <header class="hero">
       <div class="top-bar">
-        <button class="theme-toggle" id="themeToggle" type="button">深色模式</button>
+        <span class="app-wordmark">番茄钟</span>
+        <div class="top-actions">
+          <button class="theme-toggle" id="themeToggle" type="button" hidden>深色模式</button>
+          <button class="settings-open-btn" id="openSettingsBtn" type="button" aria-label="打开账号与设置">设置</button>
+        </div>
       </div>
-      <h1>番茄钟</h1>
     </header>
 
     <div class="page-shell">
-      <section class="app-page active" data-page="home" aria-label="首页">
-        <section class="home-hero-card card">
-          <div>
-            <p class="page-kicker">Today</p>
-            <h2>今天的复习节奏</h2>
-            <span id="homeDateText">今天</span>
-          </div>
-          <div class="home-pet-chip" id="homePetChip">蓝莓企鹅 Lv.1</div>
-        </section>
+      <section class="app-page active" data-page="home" aria-label="今日页">
+        <div class="page-intro today-intro">
+          <p class="page-kicker">Today</p>
+          <h2>今日</h2>
+          <span id="homeDateText">今天</span>
+        </div>
 
-        <section class="home-overview-grid" aria-label="今日概览">
-          <article class="home-overview-card">
-            <span id="homeTaskProgress">0 / 0</span>
-            <strong>今日任务</strong>
-          </article>
-          <article class="home-overview-card">
-            <span id="homeFocusMinutes">0</span>
-            <strong>专注分钟</strong>
-          </article>
-          <article class="home-overview-card">
-            <span id="homeGoalProgress">0 / 8</span>
-            <strong>今日番茄</strong>
-          </article>
-          <article class="home-overview-card">
-            <span id="homeStreakText">连续 0</span>
-            <strong>学习节奏</strong>
-          </article>
-        </section>
+        <div class="today-stack">
+          <section class="ai-plan-banner" id="aiPlanBanner" hidden>
+            <div>
+              <p class="page-kicker">AI Plan</p>
+              <strong id="aiPlanBannerTitle">AI 已帮你接上今天的任务</strong>
+              <span id="aiPlanBannerText">这些任务来自昨日复盘建议，选一件开始就好。</span>
+            </div>
+          </section>
 
-        <section class="card home-action-card">
-          <div>
-            <p class="page-kicker">Next Step</p>
-            <h2 id="homeNextTaskTitle">选择一个任务开始</h2>
-            <p id="homeNextTaskHint">先添加今日任务，或者直接进入专注。</p>
-          </div>
-          <div class="home-actions">
-            <button class="primary-btn" id="homeFocusBtn" type="button">继续专注</button>
-            <button class="secondary-btn" id="homeAddTaskBtn" type="button">添加任务</button>
-            <button class="secondary-btn" id="homeInsightsBtn" type="button">查看洞察</button>
-          </div>
-        </section>
+          <section class="card home-execution-card" aria-label="当前执行任务">
+            <p class="page-kicker">Now</p>
+            <h2 id="homeNextTaskTitle">先写下今天最重要的一件事</h2>
+            <p id="homeNextTaskHint">选择任务后才能开始番茄钟。</p>
+            <div class="home-quick-task" id="homeQuickTask" hidden>
+              <input id="homeQuickTaskInput" type="text" maxlength="60" placeholder="写下今天最重要的一件事" aria-label="快速添加今日任务">
+              <button class="primary-btn" id="homeQuickTaskBtn" type="button">添加并专注</button>
+            </div>
+          </section>
+
+          <div id="todayTimerMount"></div>
+
+          <div id="todayTaskMount"></div>
+
+          <section class="card home-pet-status-card" aria-label="今日宠物成长状态">
+            <div class="home-pet-status-head">
+              <div>
+                <p class="page-kicker">Growth</p>
+                <h2 id="homePetChip">蓝莓企鹅 Lv.1</h2>
+              </div>
+              <span id="homeGoalProgress">0 / 8</span>
+            </div>
+            <div class="home-pet-status-body">
+              <div class="home-pet-art" id="homePetArt" aria-hidden="true"></div>
+              <div class="home-pet-copy">
+                <strong>宠物正在等你完成下一轮</strong>
+                <span>专注完成后 XP 会增长，连续番茄有额外奖励。</span>
+              </div>
+            </div>
+            <div class="home-pet-progress" aria-label="首页宠物经验进度">
+              <div id="homePetProgressFill"></div>
+            </div>
+            <p class="home-pet-next" id="homePetNextHint">完成一个完整番茄后获得 XP。</p>
+            <div class="home-today-metrics" aria-label="今日学习概览">
+              <span><strong id="homeTaskProgress">0 / 0</strong> 任务</span>
+              <span><strong id="homeFocusMinutes">0</strong> 分钟</span>
+              <span><strong id="homeStreakText">连续 0</strong></span>
+            </div>
+          </section>
+
+        </div>
       </section>
 
       <section class="app-page" data-page="tasks" aria-label="今日任务页">
@@ -75,9 +146,12 @@
             <div>
               <p class="plan-date" id="todayDateText">今天</p>
               <h2>今天要完成什么？</h2>
-              <p class="hint">右滑任务可完成，完成后宠物获得 +10 XP。</p>
+              <p class="hint">左滑完成，右滑延期到明天。点击任务可设为当前专注。</p>
             </div>
-            <span class="plan-progress" id="planProgressText">已完成 0 / 0</span>
+            <div class="plan-tools">
+              <span class="plan-progress" id="planProgressText">已完成 0 / 0</span>
+              <button class="text-btn plan-expand-btn" id="planExpandBtn" type="button">展开完整计划</button>
+            </div>
           </div>
 
           <div class="carry-over-banner" id="carryOverBanner" hidden>
@@ -114,11 +188,6 @@
         </div>
 
         <section class="card timer-card" data-mode="focus" aria-label="番茄钟计时器">
-          <div class="mode-tabs" aria-label="模式切换">
-            <button class="mode-btn active" data-mode="focus">专注</button>
-            <button class="mode-btn" data-mode="rest">休息</button>
-          </div>
-
           <section class="rest-panel" aria-label="休息恢复页">
             <div class="rest-scene" aria-hidden="true">
               <div class="rest-orb">
@@ -201,7 +270,10 @@
               <h2>专注宠物</h2>
               <span class="pet-meta" id="petStageLabel">幼体</span>
             </div>
-            <div class="pet-picker" id="petPicker" aria-label="选择要培养的宠物"></div>
+            <details class="pet-picker-disclosure">
+              <summary>更换宠物</summary>
+              <div class="pet-picker" id="petPicker" aria-label="选择要培养的宠物"></div>
+            </details>
             <div class="pet-shell" id="petShell" data-stage="juvenile" role="button" tabindex="0" aria-label="查看宠物进化预览">
               <div class="pet-aura"></div>
               <div class="pet-art" id="petArt" aria-live="polite"></div>
@@ -282,11 +354,49 @@
         </section>
       </section>
 
-      <section class="app-page" data-page="insights" aria-label="学习洞察页">
+      <section class="app-page" data-page="review" aria-label="今日复盘页">
         <div class="page-intro">
-          <p class="page-kicker">Insights</p>
-          <h2>学习洞察</h2>
-          <span>统计、AI 复盘、长期趋势和学习目标都在这里。</span>
+          <p class="page-kicker">Review</p>
+          <h2>复盘</h2>
+          <span>自动整理今天完成了什么，以及明天优先做什么。</span>
+        </div>
+
+        <details class="card review-card" aria-label="今日自动复盘">
+          <summary class="review-card-summary"><span>基础复盘</span><small>无需 AI</small></summary>
+          <div class="review-card-content">
+          <div class="section-title">
+            <h2>今日总结</h2>
+            <span id="reviewDateText">今天</span>
+          </div>
+          <div class="review-grid">
+            <article>
+              <strong>完成了什么</strong>
+              <p id="reviewCompletedText">完成番茄后这里会自动生成。</p>
+            </article>
+            <article>
+              <strong>投入最多</strong>
+              <p id="reviewTopSubjectText">暂无专注记录。</p>
+            </article>
+            <article>
+              <strong>未完成任务</strong>
+              <p id="reviewUnfinishedText">暂无未完成任务。</p>
+            </article>
+            <article>
+              <strong>明天优先</strong>
+              <p id="reviewTomorrowText">先完成今天遗留的最小任务。</p>
+            </article>
+          </div>
+          <blockquote class="review-encouragement" id="reviewEncouragementText">稳定比爆发更重要。</blockquote>
+          <button class="secondary-btn review-adopt-btn" id="reviewAdoptBtn" type="button">采纳明日优先任务</button>
+          </div>
+        </details>
+      </section>
+
+      <section class="app-page" data-page="data" aria-label="学习数据页">
+        <div class="page-intro">
+          <p class="page-kicker">Data</p>
+          <h2>数据</h2>
+          <span>目标、趋势和长期学习节奏。</span>
         </div>
 
         <section class="stats-grid profile-stats-grid" aria-label="今日统计">
@@ -305,28 +415,37 @@
     <nav class="bottom-nav" aria-label="功能分页">
       <button class="nav-btn active" type="button" data-page-target="home">
         <span class="nav-icon">⌂</span>
-        <span>首页</span>
-      </button>
-      <button class="nav-btn" type="button" data-page-target="tasks">
-        <span class="nav-icon">□</span>
-        <span>任务</span>
-      </button>
-      <button class="nav-btn" type="button" data-page-target="focus">
-        <span class="nav-icon">◷</span>
-        <span>专注</span>
+        <span>今日</span>
       </button>
       <button class="nav-btn" type="button" data-page-target="pet">
         <span class="nav-icon">♧</span>
         <span>成长</span>
       </button>
-      <button class="nav-btn" type="button" data-page-target="profile">
-        <span class="nav-icon">◎</span>
-        <span>我的</span>
+      <button class="nav-btn" type="button" data-page-target="review">
+        <span class="nav-icon">✦</span>
+        <span>复盘</span>
+      </button>
+      <button class="nav-btn" type="button" data-page-target="data">
+        <span class="nav-icon">▥</span>
+        <span>数据</span>
       </button>
     </nav>
   </main>
 
-  <div class="pet-modal" id="petModal" aria-hidden="true">
+  <div class="settings-drawer" id="settingsDrawer" aria-hidden="true" inert hidden>
+    <section class="settings-drawer-card" role="dialog" aria-modal="true" aria-labelledby="settingsDrawerTitle">
+      <div class="settings-drawer-head">
+        <div>
+          <span>账号与偏好</span>
+          <h2 id="settingsDrawerTitle">设置</h2>
+        </div>
+        <button id="closeSettingsBtn" type="button" aria-label="关闭设置">×</button>
+      </div>
+      <div class="settings-drawer-content" id="settingsDrawerMount"></div>
+    </section>
+  </div>
+
+  <div class="pet-modal" id="petModal" aria-hidden="true" inert>
     <div class="pet-modal-card" role="dialog" aria-modal="true" aria-labelledby="petModalTitle">
       <div class="pet-modal-head">
         <div>
@@ -337,6 +456,34 @@
       </div>
       <p class="pet-modal-copy" id="petModalCopy">每一次完整专注，都会把它推向下一个形态。</p>
       <div class="evolution-preview-grid" id="evolutionPreviewGrid" aria-label="宠物进化阶段预览"></div>
+    </div>
+  </div>
+
+  <div class="focus-complete-modal" id="focusCompleteModal" aria-hidden="true" inert>
+    <div class="focus-complete-card" role="dialog" aria-modal="true" aria-labelledby="focusCompleteTitle">
+      <div class="focus-complete-burst" aria-hidden="true">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+      <p class="focus-complete-kicker">Focus Complete</p>
+      <h2 id="focusCompleteTitle">本轮专注完成</h2>
+      <p class="focus-complete-copy" id="focusCompleteCopy">宠物获得经验，今天的节奏又稳了一点。</p>
+      <div class="focus-complete-stats" aria-label="本轮奖励">
+        <span id="focusCompleteXp">+0 XP</span>
+        <span id="focusCompletePomodoro">今日番茄 +1</span>
+      </div>
+      <div class="focus-complete-pet">
+        <div class="focus-complete-pet-art" id="focusCompletePetArt" aria-hidden="true"></div>
+        <div>
+          <strong id="focusCompletePetText">宠物经验条增长了</strong>
+          <small id="focusCompleteRestHint">建议休息 5 分钟</small>
+        </div>
+      </div>
+      <div class="focus-complete-actions">
+        <button class="primary-btn" id="startRestFromModalBtn" type="button">开始休息</button>
+        <button class="secondary-btn" id="skipRestFromModalBtn" type="button">跳过休息</button>
+      </div>
     </div>
   </div>
 
