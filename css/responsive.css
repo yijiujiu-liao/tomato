@@ -1,0 +1,101 @@
+}
+
+@media (min-width: 430px) {
+  .controls {
+    grid-template-columns: 1.2fr 1fr 1fr 1fr;
+  }
+
+  .controls .primary-btn {
+    grid-column: auto;
+    min-height: 46px;
+  }
+}
+
+@media (max-width: 360px) {
+  .app {
+    padding-inline: 9px;
+  }
+
+  .account-field-row,
+  .account-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .account-sync-tools {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .account-sync-tools span {
+    text-align: left;
+  }
+
+  .cloud-stats-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .study-goals-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ai-summary-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ai-summary-generate {
+    width: 100%;
+  }
+
+  .study-goal-form {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-range-tabs {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .cloud-stats-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stats-heatmap-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .stats-heatmap-head span {
+    text-align: left;
+  }
+
+  .stats-heatmap {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .pet-picker {
+    margin-inline: -1px;
+  }
+
+  .top-bar {
+    gap: 8px;
+  }
+
+  .timer-display {
+    font-size: 56px;
+  }
+
+  .bottom-nav {
+    gap: 5px;
+  }
+
+  .nav-btn {
+    min-height: 44px;
+  }
+
+  .pet-stats {
+    gap: 8px;
+  }
+}

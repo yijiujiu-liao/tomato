@@ -1,0 +1,82 @@
+export function createCloudRepository(request) {
+  return {
+    authenticate(mode, credentials) {
+      return request(`/api/auth/${mode === "register" ? "register" : "login"}`, {
+        method: "POST",
+        body: credentials,
+        skipAuth: true,
+      });
+    },
+    logout() {
+      return request("/api/auth/logout", { method: "POST" });
+    },
+    pullState() {
+      return request("/api/sync");
+    },
+    fetchStats(range) {
+      return request(`/api/stats?range=${encodeURIComponent(range)}`);
+    },
+    getDailySummary(dateKey) {
+      return request(`/api/ai/daily-summary?dateKey=${encodeURIComponent(dateKey)}`);
+    },
+    generateDailySummary(dateKey, force = false) {
+      return request("/api/ai/daily-summary", {
+        method: "POST",
+        body: { dateKey, force },
+      });
+    },
+    createFocusSession(record) {
+      return request("/api/focus-sessions", {
+        method: "POST",
+        body: record,
+      });
+    },
+    createStudyGoal(goal) {
+      return request("/api/study-goals", {
+        method: "POST",
+        body: {
+          clientId: goal.clientId || goal.id,
+          title: goal.title,
+          targetMinutes: goal.targetMinutes,
+          targetDate: goal.targetDate,
+          completed: goal.completed,
+        },
+      });
+    },
+    updateStudyGoal(goalId, patch) {
+      return request(`/api/study-goals/${goalId}`, { method: "PATCH", body: patch });
+    },
+    deleteStudyGoal(goalId) {
+      return request(`/api/study-goals/${goalId}`, { method: "DELETE" });
+    },
+    updateSettings(settings) {
+      return request("/api/settings", { method: "PUT", body: settings });
+    },
+    updatePet(pet) {
+      return request("/api/pet", { method: "PUT", body: pet });
+    },
+    createTask(task, dateKey) {
+      return request("/api/tasks", {
+        method: "POST",
+        body: {
+          clientId: task.clientId || task.id,
+          title: task.title,
+          dateKey,
+          completed: task.completed,
+          carriedFromId: task.carriedFromId || null,
+          source: task.source || "",
+          sourceLabel: task.sourceLabel || "",
+          sourceDateKey: task.sourceDateKey || "",
+          suggestedForDate: task.suggestedForDate || "",
+          aiGeneratedAt: task.aiGeneratedAt || "",
+        },
+      });
+    },
+    updateTask(taskId, patch) {
+      return request(`/api/tasks/${taskId}`, { method: "PATCH", body: patch });
+    },
+    deleteTask(taskId) {
+      return request(`/api/tasks/${taskId}`, { method: "DELETE" });
+    },
+  };
+}

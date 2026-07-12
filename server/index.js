@@ -51,6 +51,7 @@ const staticOptions = {
 };
 
 app.use("/js", express.static(join(publicDir, "js"), staticOptions));
+app.use("/css", express.static(join(publicDir, "css"), staticOptions));
 app.use("/assets", express.static(join(publicDir, "assets"), staticOptions));
 
 for (const asset of ["style.css", "script.js", "sw.js", "manifest.json", "icon-192.png", "icon-512.png", "icon.svg"]) {

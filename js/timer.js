@@ -26,3 +26,32 @@ export function normalizeActiveTimer(value) {
     endsAt: new Date(endsAt).toISOString()
   };
 }
+
+export function createActiveTimerSnapshot({ date, mode, endsAt }) {
+  return normalizeActiveTimer({
+    date,
+    mode,
+    endsAt: new Date(endsAt).toISOString()
+  });
+}
+
+export function restoreActiveTimerSnapshot(value, { todayKey, now = Date.now(), getDateKey }) {
+  const activeTimer = normalizeActiveTimer(value);
+
+  if (!activeTimer) {
+    return { status: "invalid" };
+  }
+
+  const endsAt = new Date(activeTimer.endsAt).getTime();
+  if (getDateKey(new Date(endsAt)) !== todayKey) {
+    return { status: "outdated" };
+  }
+
+  const remainingSeconds = getRemainingSeconds(endsAt, now);
+  return {
+    status: remainingSeconds > 0 ? "running" : "expired",
+    mode: activeTimer.mode,
+    endsAt,
+    remainingSeconds
+  };
+}

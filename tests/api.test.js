@@ -55,6 +55,13 @@ test("core study management API supports auth, sync, stats, and idempotent offli
   assert.equal(health.service, "kaoyan-pomodoro-api");
   assert.equal(readiness.ok, true);
 
+  for (const stylesheet of ["/css/theme.css", "/css/base.css", "/css/layout.css"]) {
+    const response = await fetch(`${baseUrl}${stylesheet}`);
+    assert.equal(response.status, 200, `${stylesheet} must be publicly available`);
+    assert.match(response.headers.get("content-type") || "", /^text\/css/);
+    assert.ok((await response.text()).length > 20);
+  }
+
   for (const privatePath of ["/data/tomato.sqlite", "/data/tomato.sqlite-wal", "/server/index.js", "/tests/api.test.js", "/package.json"]) {
     const response = await fetch(`${baseUrl}${privatePath}`);
     assert.equal(response.status, 404, `${privatePath} must not be publicly downloadable`);

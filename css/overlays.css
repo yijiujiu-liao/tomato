@@ -1,0 +1,509 @@
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.pet-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: end center;
+  padding: 14px;
+  background: rgba(15, 25, 23, 0.48);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+
+.pet-modal[aria-hidden="false"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.pet-modal-card {
+  width: min(100%, 460px);
+  max-height: calc(100dvh - 28px);
+  overflow-y: auto;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(244, 184, 102, 0.22), transparent 28%),
+    linear-gradient(160deg, var(--card), rgba(218, 240, 232, 0.96));
+  box-shadow: 0 28px 60px rgba(0, 0, 0, 0.24);
+  transform: translateY(16px);
+  transition: transform 0.18s ease;
+}
+
+body.dark .pet-modal-card {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(240, 163, 90, 0.18), transparent 30%),
+    linear-gradient(160deg, #192825, #14211f);
+}
+
+.pet-modal[aria-hidden="false"] .pet-modal-card {
+  transform: translateY(0);
+}
+
+.pet-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.pet-modal-kicker {
+  margin-bottom: 2px;
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.pet-modal-head h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.pet-modal-close {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  color: var(--brand-dark);
+  background: var(--soft);
+  font-size: 25px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.pet-modal-copy {
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.focus-complete-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  display: grid;
+  place-items: end center;
+  padding: 14px;
+  background: rgba(15, 25, 23, 0.5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.focus-complete-modal[aria-hidden="false"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.focus-complete-card {
+  position: relative;
+  width: min(100%, 440px);
+  overflow: hidden;
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(244, 184, 102, 0.34), transparent 30%),
+    radial-gradient(circle at 90% 16%, rgba(122, 207, 183, 0.28), transparent 32%),
+    linear-gradient(160deg, var(--card), rgba(218, 240, 232, 0.98));
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.26);
+}
+
+body.dark .focus-complete-card {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(240, 163, 90, 0.18), transparent 30%),
+    radial-gradient(circle at 90% 16%, rgba(119, 201, 181, 0.18), transparent 32%),
+    linear-gradient(160deg, #192825, #14211f);
+}
+
+.focus-complete-modal[aria-hidden="false"] .focus-complete-card {
+  animation: rewardCardIn 0.36s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.focus-complete-burst {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.focus-complete-burst span {
+  position: absolute;
+  width: 92px;
+  height: 92px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(239, 141, 67, 0.26), transparent 68%);
+  animation: rewardBurst 1.5s ease-out infinite;
+}
+
+.focus-complete-burst span:nth-child(1) {
+  left: -22px;
+  top: 28px;
+}
+
+.focus-complete-burst span:nth-child(2) {
+  right: 16px;
+  top: -18px;
+  animation-delay: 0.18s;
+}
+
+.focus-complete-burst span:nth-child(3) {
+  right: 72px;
+  bottom: 18px;
+  background: radial-gradient(circle, rgba(37, 99, 90, 0.22), transparent 68%);
+  animation-delay: 0.32s;
+}
+
+.focus-complete-kicker {
+  position: relative;
+  margin: 0 0 4px;
+  color: var(--brand);
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.focus-complete-card h2 {
+  position: relative;
+  margin: 0 0 8px;
+  color: var(--ink);
+  font-size: 26px;
+  font-weight: 950;
+  letter-spacing: -0.04em;
+}
+
+.focus-complete-copy {
+  position: relative;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 780;
+  line-height: 1.7;
+}
+
+.focus-complete-stats {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 16px;
+}
+
+.focus-complete-stats span {
+  min-height: 58px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  color: var(--brand-dark);
+  background: rgba(255, 255, 255, 0.48);
+  font-size: 15px;
+  font-weight: 950;
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 90, 0.08);
+}
+
+.focus-complete-stats span:first-child {
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--brand));
+}
+
+.focus-complete-pet {
+  position: relative;
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.focus-complete-pet-art {
+  animation: rewardPetHop 0.7s ease both;
+}
+
+.focus-complete-pet strong,
+.focus-complete-pet small {
+  display: block;
+}
+
+.focus-complete-pet strong {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.focus-complete-pet small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.focus-complete-actions {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.focus-complete-actions .primary-btn,
+.focus-complete-actions .secondary-btn {
+  min-height: 50px;
+}
+
+.evolution-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.evolution-preview-item {
+  position: relative;
+  display: grid;
+  gap: 7px;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.42);
+  opacity: 0.48;
+  filter: grayscale(0.5);
+}
+
+.evolution-preview-item[data-unlocked="true"] {
+  opacity: 1;
+  filter: none;
+}
+
+.evolution-preview-item[data-current="true"] {
+  border-color: rgba(239, 141, 67, 0.55);
+  box-shadow: inset 0 0 0 2px rgba(239, 141, 67, 0.16), 0 12px 22px rgba(37, 99, 90, 0.12);
+}
+
+.evolution-preview-item[data-current="true"]::after {
+  content: "当前";
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--accent);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.evolution-preview-art {
+  display: grid;
+  place-items: center;
+  min-height: 78px;
+}
+
+.evolution-preview-art .pet-frame {
+  width: min(74px, 72%);
+}
+
+.evolution-preview-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.evolution-preview-info strong {
+  font-size: 13px;
+}
+
+.evolution-preview-info span,
+.evolution-preview-item em {
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(0.92);
+  }
+
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+@keyframes ripple {
+  0%,
+  100% {
+    opacity: 0.16;
+    transform: scale(0.94);
+  }
+
+  50% {
+    opacity: 0.42;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes cloudDrift {
+  from {
+    transform: translateX(-8px);
+  }
+
+  to {
+    transform: translateX(8px);
+  }
+}
+
+@keyframes xpPop {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.94);
+  }
+
+  18% {
+    opacity: 1;
+    transform: translateY(0) scale(1.04);
+  }
+
+  72% {
+    opacity: 1;
+    transform: translateY(-8px) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-18px) scale(0.98);
+  }
+}
+
+@keyframes rewardCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes rewardBurst {
+  0% {
+    opacity: 0.72;
+    transform: scale(0.72);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+@keyframes rewardPetHop {
+  0% {
+    transform: translateY(8px) scale(0.94);
+  }
+
+  60% {
+    transform: translateY(-6px) scale(1.04);
+  }
+
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes taskDoneBadge {
+  0% {
+    opacity: 0;
+    transform: translateY(5px) scale(0.9);
+  }
+
+  22%,
+  68% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.96);
+  }
+}
+
+@keyframes petFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes petWobble {
+  0%,
+  100% {
+    transform: rotate(0deg) translateY(0);
+  }
+
+  25% {
+    transform: rotate(-8deg) translateY(-2px);
+  }
+
+  75% {
+    transform: rotate(8deg) translateY(-2px);
+  }
+}
+
+@keyframes petPulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+@keyframes petBounce {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+
+  50% {
+    transform: translateY(-8px) scale(1.02);
+  }
+}
+
+@keyframes petCelebrate {
+  from {
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    transform: translateY(-4px) scale(1.06);
+  }
