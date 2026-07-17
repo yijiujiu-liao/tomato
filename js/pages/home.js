@@ -1,6 +1,15 @@
 import { createPetProgress, getEvolutionStage, getNextStageProgress, normalizePetType, renderPetImage } from "../pet.js";
 import { PET_TYPES } from "../state.js";
 
+export function addTaskAndStartFocus({ title, addTask, startFocus }) {
+  const cleanTitle = String(title || "").trim();
+  if (!addTask(cleanTitle)) {
+    return { added: false, started: false };
+  }
+
+  return { added: true, started: Boolean(startFocus()) };
+}
+
 export function renderHomePage({ elements, tasks, todayData, formatPlanDate }) {
   document.body.classList.toggle("has-no-tasks", tasks.length === 0);
   const progress = todayData.petProgress || createPetProgress(todayData.selectedPet);
@@ -26,6 +35,23 @@ export function renderHomePage({ elements, tasks, todayData, formatPlanDate }) {
       ? `距离下一阶段还差 ${nextStage.xp} XP，约 ${nextStage.tomatoes} 个番茄。`
       : "已经是完全体，继续积累长期成长。";
   }
+}
+
+export function getHomeReviewState({ tasks, completedCount, dailyGoal }) {
+  const hasTasks = tasks.length > 0;
+  const allTasksCompleted = hasTasks && tasks.every((task) => task.completed);
+  const goalReached = completedCount > 0 && completedCount >= dailyGoal;
+
+  if (!allTasksCompleted && !goalReached) {
+    return { visible: false, label: "" };
+  }
+
+  return {
+    visible: true,
+    label: allTasksCompleted
+      ? "今日任务已完成，生成明日计划"
+      : "今日番茄已达标，进入复盘",
+  };
 }
 
 function renderAiPlanBanner(elements, tasks) {
@@ -62,6 +88,15 @@ export function renderHomePageView({
   elements.homeStreakText.textContent = `连续 ${todayData.streak || 0}`;
   elements.homePetChip.textContent = `${petName} Lv.${petLevel}`;
   elements.homeQuickTask.hidden = tasks.length > 0;
+  if (elements.homeReviewBtn) {
+    const reviewState = getHomeReviewState({
+      tasks,
+      completedCount: todayData.completedCount,
+      dailyGoal: todayData.dailyGoal,
+    });
+    elements.homeReviewBtn.hidden = !reviewState.visible;
+    elements.homeReviewBtn.textContent = reviewState.label;
+  }
 
   if (selectedTask) {
     elements.homeNextTaskTitle.textContent = selectedTask.title;

@@ -3,6 +3,9 @@ import { config } from "./config.js";
 import { createDefaultUserState, createId, db, nowIso } from "./db.js";
 
 const PASSWORD_KEY_LENGTH = 64;
+const MAX_PASSWORD_LENGTH = 128;
+const MAX_EMAIL_LENGTH = 254;
+const MAX_DISPLAY_NAME_LENGTH = 60;
 
 function hashToken(token) {
   return createHash("sha256").update(token).digest("hex");
@@ -16,28 +19,44 @@ export function hashPassword(password) {
 }
 
 export function verifyPassword(password, storedHash) {
+  const candidate = typeof password === "string" ? password : "";
+  if (candidate.length < 8 || candidate.length > MAX_PASSWORD_LENGTH) {
+    return false;
+  }
+
   const [salt, hash] = String(storedHash).split(":");
 
   if (!salt || !hash) {
     return false;
   }
 
-  const derived = scryptSync(password, salt, PASSWORD_KEY_LENGTH);
+  const derived = scryptSync(candidate, salt, PASSWORD_KEY_LENGTH);
   const expected = Buffer.from(hash, "hex");
 
   return expected.length === derived.length && timingSafeEqual(expected, derived);
 }
 
-export function createUser({ email, password, displayName }) {
+export function createUser({ email, password, displayName } = {}) {
   const normalizedEmail = String(email || "").trim().toLowerCase();
-  const cleanDisplayName = String(displayName || "").trim() || normalizedEmail.split("@")[0] || "学习者";
+  const cleanDisplayName = (
+    String(displayName || "").trim()
+    || normalizedEmail.split("@")[0]
+    || "学习者"
+  ).slice(0, MAX_DISPLAY_NAME_LENGTH);
 
-  if (!normalizedEmail.includes("@")) {
+  if (
+    normalizedEmail.length > MAX_EMAIL_LENGTH
+    || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)
+  ) {
     throw Object.assign(new Error("请输入有效邮箱。"), { statusCode: 400 });
   }
 
   if (String(password || "").length < 8) {
     throw Object.assign(new Error("密码至少需要 8 位。"), { statusCode: 400 });
+  }
+
+  if (String(password).length > MAX_PASSWORD_LENGTH) {
+    throw Object.assign(new Error("密码不能超过 128 位。"), { statusCode: 400 });
   }
 
   const userId = createId();
@@ -90,6 +109,7 @@ export function getUserById(userId) {
 }
 
 export function createSession(userId) {
+  pruneExpiredSessions();
   const token = randomBytes(32).toString("base64url");
   const createdAt = nowIso();
   const expiresAt = new Date(Date.now() + config.sessionTtlDays * 24 * 60 * 60 * 1000).toISOString();
@@ -103,6 +123,10 @@ export function createSession(userId) {
     token,
     expiresAt
   };
+}
+
+export function pruneExpiredSessions(currentTime = nowIso()) {
+  return db.prepare("DELETE FROM sessions WHERE expires_at <= ?").run(currentTime).changes;
 }
 
 export function deleteSession(token) {

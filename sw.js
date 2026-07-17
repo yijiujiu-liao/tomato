@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaoyan-pomodoro-v49";
+const CACHE_NAME = "kaoyan-pomodoro-v58";
 const ASSETS = [
   "./",
   "./index.html",
@@ -11,16 +11,19 @@ const ASSETS = [
   "./css/overlays.css",
   "./css/responsive.css",
   "./css/refinements.css",
+  "./css/focus-session.css",
   "./script.js",
   "./js/state.js",
   "./js/api.js",
   "./js/authController.js",
   "./js/cloudRepository.js",
+  "./js/cloudStatsController.js",
   "./js/cloudSync.js",
   "./js/cloudState.js",
   "./js/timer.js",
   "./js/timerEngine.js",
   "./js/timerController.js",
+  "./js/activeTimerController.js",
   "./js/effects.js",
   "./js/navigation.js",
   "./js/utils.js",
@@ -36,6 +39,7 @@ const ASSETS = [
   "./js/focusRecords.js",
   "./js/focusSession.js",
   "./js/focusFlowController.js",
+  "./js/focusSessionController.js",
   "./js/sync.js",
   "./js/studySyncController.js",
   "./js/aiReview.js",
@@ -48,6 +52,7 @@ const ASSETS = [
   "./js/components/timerPanel.js",
   "./js/components/taskSwipe.js",
   "./js/components/studyGoals.js",
+  "./js/components/currentGoal.js",
   "./js/components/feedback.js",
   "./js/components/diagnostics.js",
   "./js/components/stats.js",
@@ -57,6 +62,7 @@ const ASSETS = [
   "./js/pages/review.js",
   "./js/pages/pet.js",
   "./js/pages/data.js",
+  "./js/pages/focusSession.js",
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png",
@@ -104,17 +110,28 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     fetch(event.request)
       .then((networkResponse) => {
-        const responseCopy = networkResponse.clone();
-
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseCopy);
-        });
+        if (networkResponse.ok) {
+          const responseCopy = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseCopy);
+          });
+        }
 
         return networkResponse;
       })
       .catch(() => {
         return caches.match(event.request)
-          .then((cachedResponse) => cachedResponse || (isAppShellRequest ? caches.match("./index.html") : null));
+          .then(async (cachedResponse) => {
+            if (cachedResponse) return cachedResponse;
+            if (isAppShellRequest) {
+              const shell = await caches.match("./index.html");
+              if (shell) return shell;
+            }
+            return new Response("当前离线，且此资源尚未缓存。", {
+              status: 503,
+              headers: { "Content-Type": "text/plain; charset=utf-8" },
+            });
+          });
       })
   );
 });

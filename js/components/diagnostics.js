@@ -1,10 +1,9 @@
-export function buildStudyDiagnostics({
+export function buildStudyDiagnosticItems({
   todayData,
   todayTasks,
   recentPlans,
   studyGoals,
-  inferSubject,
-  escapeHtml
+  inferSubject
 }) {
   const pendingTasks = todayTasks.filter((task) => !task.completed);
   const completedTasks = todayTasks.filter((task) => task.completed);
@@ -52,10 +51,24 @@ export function buildStudyDiagnostics({
         ? `${weakestSubject} 最近记录偏少，明天至少安排 1 个番茄补上。`
         : `${topSubject[0]} 投入最多，累计 ${topSubject[1]} 分钟。`
     }
-  ].map((item) => `
+  ];
+}
+
+export function getPrimaryStudyDiagnostic(items) {
+  const priorities = { bad: 0, warn: 1, good: 2 };
+  return [...items].sort((left, right) => priorities[left.level] - priorities[right.level])[0] || {
+    title: "先完成第一轮专注",
+    level: "warn",
+    text: "有了第一条记录后，系统才能判断今天的执行节奏。",
+  };
+}
+
+export function buildStudyDiagnostics(context) {
+  const items = buildStudyDiagnosticItems(context);
+  return items.map((item) => `
     <article class="diagnosis-item" data-level="${item.level}">
-      <strong>${escapeHtml(item.title)}</strong>
-      <p>${escapeHtml(item.text)}</p>
+      <strong>${context.escapeHtml(item.title)}</strong>
+      <p>${context.escapeHtml(item.text)}</p>
     </article>
   `).join("");
 }

@@ -65,6 +65,7 @@ db.exec(`
     source_date_key TEXT,
     suggested_for_date TEXT,
     ai_generated_at TEXT,
+    xp_earned INTEGER NOT NULL DEFAULT 0,
     updated_at TEXT NOT NULL
   );
 
@@ -147,6 +148,10 @@ if (!taskColumns.includes("suggested_for_date")) {
 
 if (!taskColumns.includes("ai_generated_at")) {
   db.exec("ALTER TABLE tasks ADD COLUMN ai_generated_at TEXT");
+}
+
+if (!taskColumns.includes("xp_earned")) {
+  db.exec("ALTER TABLE tasks ADD COLUMN xp_earned INTEGER NOT NULL DEFAULT 0");
 }
 
 if (!focusSessionColumns.includes("client_id")) {
@@ -242,6 +247,7 @@ export function taskFromRow(row) {
     sourceDateKey: row.source_date_key || "",
     suggestedForDate: row.suggested_for_date || "",
     aiGeneratedAt: row.ai_generated_at || "",
+    xpEarned: Number(row.xp_earned) || 0,
     updatedAt: row.updated_at
   };
 }

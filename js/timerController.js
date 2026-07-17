@@ -73,7 +73,16 @@ export function createTimerController({
 
   function abandon() {
     const state = engine.getState();
-    if (state.mode === "focus" && state.running && !confirmAbandon("确定放弃本轮专注吗？本轮不会获得 XP，也不会写入学习记录。")) {
+    const focusHasStarted = state.mode === "focus"
+      && (state.running || state.remainingSeconds < modes.focus.minutes * 60);
+    const restHasStarted = state.mode === "rest"
+      && (state.running || state.remainingSeconds < modes.rest.minutes * 60);
+
+    if ((focusHasStarted || restHasStarted) && !confirmAbandon(
+      focusHasStarted
+        ? "本轮记录不会保存，确定退出吗？"
+        : "本轮休息还没有结束，确定退出吗？"
+    )) {
       return false;
     }
     reset();

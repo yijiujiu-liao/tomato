@@ -71,8 +71,7 @@ export function createTaskController({
       saveData();
     }
     savePlans();
-    renderTasks();
-    renderCurrentOptions();
+    refresh();
     runCloudSync(() => syncController.patchTask(task, { title: task.title }));
     return true;
   }
@@ -88,8 +87,7 @@ export function createTaskController({
       saveData();
     }
     savePlans();
-    renderTasks();
-    renderCurrentOptions();
+    refresh();
     if (task.syncedTaskId) {
       taskStore.rememberDeleted(task.syncedTaskId);
       runCloudSync(() => syncController.deleteTask(task.syncedTaskId));
@@ -123,8 +121,11 @@ export function createTaskController({
     const task = getTodayTasks().find((item) => item.id === taskId);
     if (!task || task.completed) return false;
     setTaskCompleted(task, true);
-    const reward = petController.addXP(10);
-    task.xpEarned = reward.totalXP;
+    const alreadyRewarded = normalizeNonNegativeInteger(task.xpEarned) > 0;
+    const reward = alreadyRewarded
+      ? { totalXP: 0, bonusPercent: 0, leveledUp: false, evolved: false }
+      : petController.addXP(10);
+    if (!alreadyRewarded) task.xpEarned = reward.totalXP;
     vibrate();
     const data = getData();
     if (data.currentTaskId === task.id) {
@@ -136,10 +137,15 @@ export function createTaskController({
     saveData();
     refresh({ pet: true });
     runCloudSync(async () => {
-      await syncController.patchTask(task, { completed: true });
+      await syncController.patchTask(task, { completed: true, xpEarned: task.xpEarned });
       await syncController.syncPet();
     });
-    showToast(`任务完成！宠物获得 +${reward.totalXP} XP`, () => restore(task.id));
+    const completionMessage = alreadyRewarded
+      ? "任务再次完成，本次不重复获得 XP。"
+      : task.source === "ai"
+      ? `AI 承接任务完成！宠物 +${reward.totalXP} XP，今晚复盘会据此调整计划。`
+      : `任务完成！宠物获得 +${reward.totalXP} XP`;
+    showToast(completionMessage, () => restore(task.id));
     switchPage("review");
     return { task, reward };
   }
@@ -181,9 +187,6 @@ export function createTaskController({
     const task = getTodayTasks().find((item) => item.id === taskId);
     if (!task) return false;
     setTaskCompleted(task, false);
-    const xp = normalizeNonNegativeInteger(task.xpEarned);
-    task.xpEarned = 0;
-    petController.removeXP(xp);
     const data = getData();
     if (!data.currentTaskId) {
       data.currentTaskId = task.id;

@@ -25,6 +25,8 @@ cmd /c npm start
 - Health check: `http://localhost:3000/api/health`
 - Readiness check: `http://localhost:3000/api/ready`
 
+`/api/health` 会返回 `storage.status` 和 `ai.status`。Render 正常挂载磁盘时前者应为 `persistent`；配置好 AI Key 后后者应为 `ready`。若存储状态为 `ephemeral-risk`，请先修复磁盘与 `DATABASE_PATH`，否则重启后账号和学习记录可能丢失。
+
 Windows PowerShell 可能会阻止 `npm.ps1`，所以建议使用 `cmd /c npm ...`。
 
 ## 常用命令
@@ -39,7 +41,7 @@ cmd /c npm start
 
 ## 环境变量
 
-复制 `.env.example` 后按需调整。当前服务不会自动读取 `.env` 文件，部署平台需要把这些变量配置到运行环境中。
+复制 `.env.example` 为 `.env` 后按需调整，`npm start` 和 `npm run dev` 会自动读取该文件；`.env` 已被 Git 忽略。Render 等部署平台仍建议直接使用平台环境变量。
 
 ```bash
 NODE_ENV=production
@@ -125,6 +127,42 @@ AI 学习教练：
 4. 部署后检查 `/api/health` 和 `/api/ready`。
 5. 当前使用 Node.js 内置 SQLite，Node 会提示实验性警告；生产长期使用时建议评估迁移到稳定 SQLite 包或托管数据库。
 
+## 自购服务器部署
+
+仓库包含 `Dockerfile`、`compose.yaml` 和 `Caddyfile`。推荐给服务器绑定域名，由 Caddy 自动申请和续期 HTTPS 证书。
+
+1. 把域名的 A 记录指向服务器公网 IP，并开放 TCP `80`、`443` 和 UDP `443`。
+2. 在服务器项目目录创建 `.env`：
+
+```bash
+SITE_ADDRESS=study.example.com
+ENFORCE_HTTPS=true
+SESSION_TTL_DAYS=30
+AI_PROVIDER=deepseek
+DEEPSEEK_API_KEY=你的服务端密钥
+BACKUP_RETENTION=14
+```
+
+3. 构建并启动：
+
+```bash
+docker compose up -d --build
+docker compose ps
+curl https://study.example.com/api/ready
+```
+
+数据库保存在 Docker 的 `tomato-data` volume 中。备份服务每天使用 SQLite 在线备份生成一致性快照，文件写入宿主机项目目录下的 `./backups`，默认保留 14 份。生产环境还应定期把备份复制到另一台机器或对象存储，避免服务器磁盘损坏时数据库和本机备份一起丢失。
+
+更新版本：
+
+```bash
+git pull
+docker compose up -d --build
+docker image prune -f
+```
+
+暂时没有域名时，可以设置 `SITE_ADDRESS=:80`、`ENFORCE_HTTPS=false` 通过 IP 访问；但正式给他人使用前应切换到 HTTPS，否则登录令牌、PWA 安装和浏览器安全能力都不适合长期使用。
+
 ## Render 部署
 
 仓库已经包含 `render.yaml`，可以用 Render Blueprint 部署：
@@ -149,14 +187,14 @@ AI 学习教练：
 
 ## Fly.io 备选
 
-如果改用 Fly.io，也可以部署这个 Node 服务，但需要创建 Volume 并把 `DATABASE_PATH` 指向 Volume 内的路径，例如：
+如果改用 Fly.io，可以复用当前 `Dockerfile`，但仍需创建 Volume 并把 `DATABASE_PATH` 指向 Volume 内的路径，例如：
 
 ```bash
 DATABASE_PATH=/data/tomato.sqlite
 ```
 
-Fly.io 方案后续需要补 `Dockerfile` / `fly.toml`，核心原则同样是：SQLite 数据库必须放在持久化 Volume 中。
+Fly.io 方案仍需补 `fly.toml`。核心原则同样是：SQLite 数据库必须放在持久化 Volume 中。
 
 ## 项目状态
 
-当前已经具备完整前后端学习管理应用的核心闭环。后续可以继续加强：生产数据库方案、更多端到端 UI 测试、数据导出、账户资料管理、部署流水线。
+当前已经具备完整前后端学习管理应用的核心闭环。后续可继续加强：PostgreSQL 迁移、自动化端到端 UI 测试、数据导出、找回密码和部署流水线。

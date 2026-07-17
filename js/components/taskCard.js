@@ -37,6 +37,8 @@ export function buildTaskCardHtml({ task, completedTime, escapeHtml, sourceLabel
           <details class="task-more">
             <summary class="task-action-btn">更多</summary>
             <div class="task-more-menu">
+              <button type="button" data-action="complete" data-task-id="${task.id}">标记完成</button>
+              <button type="button" data-action="delay" data-task-id="${task.id}">延期到明天</button>
               <button type="button" data-action="edit" data-task-id="${task.id}">编辑</button>
               <button type="button" data-action="delete" data-task-id="${task.id}">删除</button>
             </div>

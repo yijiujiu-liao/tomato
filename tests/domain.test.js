@@ -29,6 +29,7 @@ import {
   normalizeTask,
   renameTask,
   setTaskCompleted,
+  resolveExecutableTaskSelection,
   sortExecutableTasks
 } from "../js/tasks.js";
 import { createTaskStore } from "../js/taskStore.js";
@@ -174,6 +175,10 @@ test("task, goal, and focus-record modules preserve domain metadata", () => {
   });
   assert.equal(ai.sourceLabel, "AI 明日建议");
   assert.deepEqual(sortExecutableTasks([manual, ai], "manual").map((task) => task.id), ["manual", "ai"]);
+  assert.deepEqual(sortExecutableTasks([manual, ai]).map((task) => task.id), ["ai", "manual"]);
+  assert.equal(resolveExecutableTaskSelection([manual, ai], "manual").task.id, "manual");
+  assert.equal(resolveExecutableTaskSelection([manual, ai]).changed, true);
+  assert.equal(resolveExecutableTaskSelection([{ ...manual, completed: true }], "manual").task, null);
 
   const goal = normalizeStudyGoal({ id: "goal-1", title: " 政治背诵 ", targetMinutes: 120 });
   assert.equal(goal.title, "政治背诵");

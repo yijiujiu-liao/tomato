@@ -55,6 +55,9 @@ export function createCloudRepository(request) {
     updatePet(pet) {
       return request("/api/pet", { method: "PUT", body: pet });
     },
+    getPet() {
+      return request("/api/pet");
+    },
     createTask(task, dateKey) {
       return request("/api/tasks", {
         method: "POST",
@@ -69,6 +72,7 @@ export function createCloudRepository(request) {
           sourceDateKey: task.sourceDateKey || "",
           suggestedForDate: task.suggestedForDate || "",
           aiGeneratedAt: task.aiGeneratedAt || "",
+          xpEarned: task.xpEarned || 0,
         },
       });
     },

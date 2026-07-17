@@ -54,3 +54,100 @@ test("auth controller owns login mode, session persistence, and local access", a
   assert.equal(controller.getSession(), null);
   assert.equal(storage.getItem("auth"), null);
 });
+
+function createStoredSession(storage) {
+  storage.setItem("auth", JSON.stringify({
+    user: { id: "user-1", email: "student@example.com" },
+    session: { token: "token-1", expiresAt: "2026-08-01T00:00:00.000Z" },
+  }));
+}
+
+test("temporary sync failures keep a valid login session", async () => {
+  const storage = new MemoryStorage();
+  createStoredSession(storage);
+  const feedback = [];
+  const controller = createAuthController({
+    storage,
+    sessionStorage: new MemoryStorage(),
+    sessionKey: "auth",
+    localAccessKey: "local",
+    getRepository: () => ({}),
+    performSync: async () => { throw new Error("service warming up"); },
+    setFeedback: (message) => feedback.push(message),
+  });
+
+  assert.equal(await controller.bootstrap(), false);
+  assert.equal(controller.getSession().token, "token-1");
+  assert.match(feedback.at(-1), /保留登录状态/);
+});
+
+test("authentication failures clear an expired session", async () => {
+  const storage = new MemoryStorage();
+  createStoredSession(storage);
+  const error = Object.assign(new Error("unauthorized"), { status: 401 });
+  const controller = createAuthController({
+    storage,
+    sessionStorage: new MemoryStorage(),
+    sessionKey: "auth",
+    localAccessKey: "local",
+    getRepository: () => ({}),
+    performSync: async () => { throw error; },
+  });
+
+  assert.equal(await controller.bootstrap(), false);
+  assert.equal(controller.getSession(), null);
+  assert.equal(storage.getItem("auth"), null);
+});
+
+test("successful login survives a temporary first sync failure", async () => {
+  const storage = new MemoryStorage();
+  const controller = createAuthController({
+    storage,
+    sessionStorage: new MemoryStorage(),
+    sessionKey: "auth",
+    localAccessKey: "local",
+    getRepository: () => ({
+      authenticate: async () => ({
+        user: { id: "user-1", email: "student@example.com" },
+        token: "token-1",
+        expiresAt: "2026-08-01T00:00:00.000Z",
+      }),
+    }),
+    performSync: async () => { throw new Error("temporary sync failure"); },
+  });
+
+  assert.equal(await controller.authenticate({
+    email: "student@example.com",
+    password: "password123",
+    displayName: "",
+  }), true);
+  assert.equal(controller.getSession().token, "token-1");
+});
+
+test("authentication rejects malformed passwords before calling the API", async () => {
+  let requestCount = 0;
+  const feedback = [];
+  const controller = createAuthController({
+    storage: new MemoryStorage(),
+    sessionStorage: new MemoryStorage(),
+    sessionKey: "auth",
+    localAccessKey: "local",
+    getRepository: () => ({
+      authenticate: async () => {
+        requestCount += 1;
+        return {
+          user: { id: "user-1", email: "student@example.com" },
+          token: "token-1",
+        };
+      },
+    }),
+    setFeedback: (message, isError) => feedback.push({ message, isError }),
+  });
+
+  assert.equal(await controller.authenticate({
+    email: "student@example.com",
+    password: null,
+  }), false);
+  assert.equal(requestCount, 0);
+  assert.equal(feedback.at(-1).isError, true);
+});

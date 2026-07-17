@@ -30,6 +30,9 @@ export function createAiReviewController({ getRepository, isEnabled, onChange })
       reset();
       return false;
     }
+    if (state.status === "loading") {
+      return false;
+    }
     state = {
       ...state,
       status: "loading",

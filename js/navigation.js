@@ -4,7 +4,7 @@ const PAGE_ALIASES = {
   profile: "data",
 };
 
-const VALID_PAGES = new Set(["home", "pet", "review", "data"]);
+const VALID_PAGES = new Set(["home", "pet", "review", "data", "focus-session"]);
 
 export function getPageFromHash(hash = window.location.hash) {
   const requestedPage = hash.replace(/^#\/?/, "");
@@ -12,9 +12,21 @@ export function getPageFromHash(hash = window.location.hash) {
   return VALID_PAGES.has(page) ? page : "home";
 }
 
-export function createAppNavigator({ pages, buttons, onPageChange }) {
+export function createAppNavigator({ pages, buttons, onPageChange, canNavigate }) {
   function switchPage(pageName, options = {}) {
     const nextPageName = getPageFromHash(`#/${pageName}`);
+    const currentPageName = document.body.dataset.page || getPageFromHash();
+
+    if (
+      currentPageName !== nextPageName
+      && !options.force
+      && canNavigate?.({ from: currentPageName, to: nextPageName, options }) === false
+    ) {
+      const currentUrl = `${window.location.pathname}${window.location.search}#/${currentPageName}`;
+      window.history.replaceState({ page: currentPageName }, "", currentUrl);
+      return currentPageName;
+    }
+
     document.body.dataset.page = nextPageName;
 
     pages.forEach((page) => {

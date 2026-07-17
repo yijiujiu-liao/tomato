@@ -50,8 +50,19 @@ export function createAuthController({
     saveSessionFlag(sessionStorage, localAccessKey, false);
   }
 
+  function clearSession() {
+    session = null;
+    persistSession();
+    notify();
+  }
+
+  function isAuthenticationFailure(error) {
+    return error?.status === 401 || error?.status === 403;
+  }
+
   async function authenticate({ email, password, displayName }) {
-    if (!email || password.length < 8) {
+    const candidatePassword = typeof password === "string" ? password : "";
+    if (!email || candidatePassword.length < 8 || candidatePassword.length > 128) {
       setFeedback?.("请输入有效邮箱和至少 8 位密码", true);
       return false;
     }
@@ -59,17 +70,38 @@ export function createAuthController({
     setBusy?.(true);
     try {
       setFeedback?.(mode === "register" ? "正在创建账号..." : "正在登录...");
-      session = await getRepository().authenticate(mode, { email, password, displayName });
+      try {
+        session = await getRepository().authenticate(mode, {
+          email,
+          password: candidatePassword,
+          displayName,
+        });
+      } catch (error) {
+        setFeedback?.(error.message, true);
+        return false;
+      }
+
       clearLocalAccess();
       persistSession();
       notify();
-      await performSync?.("正在同步本地与云端...", { cloudFirst: mode === "login" });
+
+      try {
+        await performSync?.("正在同步本地与云端...", { cloudFirst: mode === "login" });
+      } catch (error) {
+        if (isAuthenticationFailure(error)) {
+          clearSession();
+          setFeedback?.("登录状态验证失败，请重新登录", true);
+          return false;
+        }
+
+        clearPassword?.();
+        setFeedback?.("登录成功，云端同步暂时失败，稍后会自动重试", true);
+        return true;
+      }
+
       clearPassword?.();
       setFeedback?.("登录成功，学习记录已同步");
       return true;
-    } catch (error) {
-      setFeedback?.(error.message, true);
-      return false;
     } finally {
       setBusy?.(false);
     }
@@ -92,11 +124,16 @@ export function createAuthController({
     if (!session?.token) return;
     try {
       await performSync?.("正在恢复云端同步...", { cloudFirst: true });
+      return true;
     } catch (error) {
-      setFeedback?.("登录已过期，请重新登录", true);
-      session = null;
-      persistSession();
-      notify();
+      if (isAuthenticationFailure(error)) {
+        setFeedback?.("登录已过期，请重新登录", true);
+        clearSession();
+        return false;
+      }
+
+      setFeedback?.("已保留登录状态，云端同步暂时不可用", true);
+      return false;
     }
   }
 

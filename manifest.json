@@ -2,12 +2,28 @@
   "name": "考研番茄钟",
   "short_name": "番茄钟",
   "description": "适合考研学习使用的手机番茄钟 PWA。",
+  "id": "./",
+  "lang": "zh-CN",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f6efe3",
+  "background_color": "#f3f1ea",
   "theme_color": "#25635a",
   "orientation": "portrait",
+  "shortcuts": [
+    {
+      "name": "开始今日专注",
+      "short_name": "今日专注",
+      "url": "./index.html#/home",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "查看今日复盘",
+      "short_name": "今日复盘",
+      "url": "./index.html#/review",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    }
+  ],
   "icons": [
     {
       "src": "icon-192.png",

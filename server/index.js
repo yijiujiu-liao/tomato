@@ -20,10 +20,43 @@ import {
   requireAuth,
   verifyPassword
 } from "./auth.js";
+import { createAiSummaryService } from "./aiService.js";
+import { getStorageStatus } from "./deployment.js";
+import { countCurrentStreakDays } from "./stats.js";
+import {
+  createApiNotFoundHandler,
+  createErrorHandler,
+  createHttpsGuard,
+  createRateLimit,
+  createSecurityHeaders,
+} from "./http.js";
+import {
+  clampInteger,
+  getCumulativeXPForLevel,
+  getEvolutionStage,
+  getNextLevelXP,
+  getPetProgressFromTotalXP,
+  normalizeDateKey,
+  normalizeOptionalDateKey,
+  normalizeOptionalString,
+  normalizePetId,
+  normalizeRequiredTitle,
+  normalizeTaskSource,
+  normalizeTimestamp,
+} from "./validation.js";
 
 export const app = express();
 const port = config.port;
 const publicDir = config.publicDir;
+const storageStatus = getStorageStatus(config);
+const {
+  getStoredDailySummary,
+  buildDailySummaryContext,
+  generateDailySummary,
+  getAiApiKey,
+  getAiModel,
+  getAiStatus,
+} = createAiSummaryService({ db, config, petFromRow });
 const authRateLimit = createRateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
 const aiRateLimit = createRateLimit({
   windowMs: 24 * 60 * 60 * 1000,
@@ -32,14 +65,9 @@ const aiRateLimit = createRateLimit({
 });
 
 app.disable("x-powered-by");
-app.use((req, res, next) => {
-  res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("X-Frame-Options", "DENY");
-  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-  res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'");
-  next();
-});
+app.set("trust proxy", config.trustProxy);
+app.use(createHttpsGuard({ enabled: config.enforceHttps }));
+app.use(createSecurityHeaders());
 app.use(express.json({ limit: "1mb" }));
 const staticOptions = {
   extensions: ["html"],
@@ -66,14 +94,21 @@ app.get("/api/health", (req, res) => {
     service: "kaoyan-pomodoro-api",
     environment: config.nodeEnv,
     uptimeSeconds: Math.round(process.uptime()),
-    database: "sqlite"
+    database: "sqlite",
+    storage: storageStatus,
+    ai: getAiStatus(),
   });
 });
 
 app.get("/api/ready", (req, res, next) => {
   try {
     db.prepare("SELECT 1 AS ok").get();
-    res.json({ ok: true, database: "ready" });
+    res.json({
+      ok: true,
+      database: "ready",
+      storage: storageStatus.status,
+      ai: getAiStatus(),
+    });
   } catch (error) {
     next(error);
   }
@@ -190,7 +225,7 @@ app.put("/api/settings", requireAuth, (req, res) => {
     dailyGoal: clampInteger(req.body?.dailyGoal, current.daily_goal, 1, 24),
     theme: req.body?.theme === "dark" ? "dark" : "light",
     nextRestType: req.body?.nextRestType === "long" ? "long" : "short",
-    currentTaskId: req.body?.currentTaskId || null,
+    currentTaskId: normalizeOwnedTaskId(userId, req.body?.currentTaskId),
     currentStudyGoalId: normalizeOwnedStudyGoalId(userId, req.body?.currentStudyGoalId),
     updatedAt: nowIso()
   };
@@ -227,15 +262,38 @@ app.get("/api/pet", requireAuth, (req, res) => {
 app.put("/api/pet", requireAuth, (req, res) => {
   const userId = req.auth.user.id;
   const current = db.prepare("SELECT * FROM pets WHERE user_id = ?").get(userId);
-  const level = clampInteger(req.body?.level, current.level, 1, 999);
-  const nextLevelXP = getNextLevelXP(level);
+  const expectedUpdatedAt = normalizeOptionalString(req.body?.updatedAt, 40);
+
+  if (expectedUpdatedAt && expectedUpdatedAt !== current.updated_at) {
+    res.status(409).json({
+      error: "宠物进度已在其他设备更新，请同步后重试。",
+      code: "PET_VERSION_CONFLICT",
+    });
+    return;
+  }
+
+  const requestedLevel = clampInteger(req.body?.level, current.level, 1, 999);
+  const requestedCurrentXP = clampInteger(
+    req.body?.currentXP,
+    current.current_xp,
+    0,
+    getNextLevelXP(requestedLevel) - 1,
+  );
+  const requestedTotalXP = clampInteger(
+    req.body?.totalXP,
+    current.total_xp,
+    0,
+    getCumulativeXPForLevel(1000) - 1,
+  );
+  const progress = getPetProgressFromTotalXP(Math.max(
+    current.total_xp,
+    requestedTotalXP,
+    getCumulativeXPForLevel(requestedLevel) + requestedCurrentXP,
+  ));
   const next = {
     petId: normalizePetId(req.body?.petId || current.pet_id),
-    level,
-    currentXP: clampInteger(req.body?.currentXP, current.current_xp, 0, nextLevelXP - 1),
-    nextLevelXP,
-    totalXP: Math.max(0, Math.floor(Number(req.body?.totalXP ?? current.total_xp))),
-    evolutionStage: getEvolutionStage(level),
+    ...progress,
+    evolutionStage: getEvolutionStage(progress.level),
     updatedAt: nowIso()
   };
 
@@ -288,6 +346,7 @@ app.post("/api/tasks", requireAuth, (req, res) => {
   const sourceDateKey = source ? normalizeOptionalDateKey(req.body?.sourceDateKey) : null;
   const suggestedForDate = source ? normalizeOptionalDateKey(req.body?.suggestedForDate) : null;
   const aiGeneratedAt = source ? normalizeOptionalString(req.body?.aiGeneratedAt, 40) : null;
+  const xpEarned = clampInteger(req.body?.xpEarned, 0, 0, 1000);
 
   if (clientId) {
     const existing = db.prepare(`
@@ -343,6 +402,7 @@ app.post("/api/tasks", requireAuth, (req, res) => {
     sourceDateKey,
     suggestedForDate,
     aiGeneratedAt,
+    xpEarned,
     updatedAt: nowIso()
   };
 
@@ -362,9 +422,10 @@ app.post("/api/tasks", requireAuth, (req, res) => {
       source_date_key,
       suggested_for_date,
       ai_generated_at,
+      xp_earned,
       updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     task.id,
     task.userId,
@@ -380,6 +441,7 @@ app.post("/api/tasks", requireAuth, (req, res) => {
     task.sourceDateKey,
     task.suggestedForDate,
     task.aiGeneratedAt,
+    task.xpEarned,
     task.updatedAt
   );
 
@@ -402,6 +464,10 @@ app.patch("/api/tasks/:taskId", requireAuth, (req, res) => {
   const title = typeof req.body?.title === "string" && req.body.title.trim()
     ? req.body.title.trim().slice(0, 60)
     : current.title;
+  const xpEarned = Math.max(
+    Number(current.xp_earned) || 0,
+    clampInteger(req.body?.xpEarned, 0, 0, 1000),
+  );
   const updatedAt = nowIso();
 
   db.prepare(`
@@ -409,9 +475,10 @@ app.patch("/api/tasks/:taskId", requireAuth, (req, res) => {
     SET title = ?,
         completed = ?,
         completed_at = ?,
+        xp_earned = ?,
         updated_at = ?
     WHERE id = ? AND user_id = ?
-  `).run(title, completed, completedAt, updatedAt, req.params.taskId, req.auth.user.id);
+  `).run(title, completed, completedAt, xpEarned, updatedAt, req.params.taskId, req.auth.user.id);
 
   const task = db.prepare("SELECT * FROM tasks WHERE id = ?").get(req.params.taskId);
   res.json({ task: taskFromRow(task) });
@@ -571,15 +638,26 @@ app.delete("/api/study-goals/:goalId", requireAuth, (req, res) => {
 
 app.post("/api/focus-sessions", requireAuth, (req, res) => {
   const minutes = clampInteger(req.body?.minutes, 50, 1, 180);
-  const endedAt = req.body?.endedAt ? new Date(req.body.endedAt).toISOString() : nowIso();
+  const endedAt = req.body?.endedAt ? normalizeTimestamp(req.body.endedAt) : nowIso();
   const startedAt = req.body?.startedAt
-    ? new Date(req.body.startedAt).toISOString()
+    ? normalizeTimestamp(req.body.startedAt)
     : new Date(new Date(endedAt).getTime() - minutes * 60 * 1000).toISOString();
-  const taskId = req.body?.taskId || null;
+
+  if (!endedAt || !startedAt) {
+    res.status(400).json({ error: "专注记录时间格式不正确。" });
+    return;
+  }
+
+  if (new Date(startedAt).getTime() > new Date(endedAt).getTime()) {
+    res.status(400).json({ error: "专注开始时间不能晚于结束时间。" });
+    return;
+  }
+
+  const taskId = normalizeOwnedTaskId(req.auth.user.id, req.body?.taskId);
   const studyGoalId = normalizeOwnedStudyGoalId(req.auth.user.id, req.body?.studyGoalId);
   const taskTitle = String(req.body?.taskTitle || "未命名学习任务").trim().slice(0, 80);
-  const streak = Math.max(0, Math.floor(Number(req.body?.streak || 0)));
-  const xpEarned = Math.max(0, Math.floor(Number(req.body?.xpEarned || minutes)));
+  const streak = clampInteger(req.body?.streak, 0, 0, 999);
+  const xpEarned = clampInteger(req.body?.xpEarned, minutes, 0, Math.ceil(minutes * 1.2));
   const clientId = normalizeOptionalString(req.body?.clientId, 120);
   const dateKey = normalizeDateKey(req.body?.dateKey || endedAt.slice(0, 10));
 
@@ -730,16 +808,15 @@ app.get("/api/ai/daily-summary", requireAuth, (req, res, next) => {
   }
 });
 
-app.post("/api/ai/daily-summary", requireAuth, aiRateLimit, async (req, res, next) => {
+app.post("/api/ai/daily-summary", requireAuth, async (req, res, next) => {
   try {
     const dateKey = normalizeDateKey(req.body?.dateKey);
     const context = buildDailySummaryContext(req.auth.user.id, dateKey);
     const sourceFingerprint = createHash("sha256").update(JSON.stringify(context)).digest("hex");
     const stored = getStoredDailySummary(req.auth.user.id, dateKey);
     const force = req.body?.force === true;
-    const cacheIsFresh = stored && Date.now() - new Date(stored.generatedAt).getTime() < 2 * 60 * 60 * 1000;
 
-    if (stored && !force && (stored.sourceFingerprint === sourceFingerprint || cacheIsFresh)) {
+    if (stored && !force && stored.sourceFingerprint === sourceFingerprint) {
       res.json({ ...stored, cached: true });
       return;
     }
@@ -749,6 +826,10 @@ app.post("/api/ai/daily-summary", requireAuth, aiRateLimit, async (req, res, nex
         code: "AI_NOT_CONFIGURED",
         error: "AI 总结尚未配置密钥。请在服务器环境变量中添加 OPENAI_API_KEY 或 DEEPSEEK_API_KEY 后重试。"
       });
+      return;
+    }
+
+    if (!aiRateLimit.consume(req, res)) {
       return;
     }
 
@@ -793,130 +874,16 @@ app.post("/api/ai/daily-summary", requireAuth, aiRateLimit, async (req, res, nex
   }
 });
 
-app.use((req, res, next) => {
-  if (req.path.startsWith("/api/")) {
-    res.status(404).json({ error: "API 不存在。" });
-    return;
-  }
-
-  next();
-});
-
-app.use((error, req, res, next) => {
-  const statusCode = error.statusCode || 500;
-
-  if (statusCode >= 500) {
-    console.error(error);
-  }
-
-  res.status(statusCode).json({
-    error: error.message || "服务器错误。"
-  });
-});
-
-function createRateLimit({ windowMs, max, key = (req) => req.ip }) {
-  const buckets = new Map();
-
-  return (req, res, next) => {
-    const now = Date.now();
-    const bucketKey = String(key(req) || "unknown");
-    const current = buckets.get(bucketKey);
-    const bucket = !current || current.resetAt <= now
-      ? { count: 0, resetAt: now + windowMs }
-      : current;
-
-    bucket.count += 1;
-    buckets.set(bucketKey, bucket);
-
-    if (bucket.count > max) {
-      res.setHeader("Retry-After", String(Math.max(1, Math.ceil((bucket.resetAt - now) / 1000))));
-      res.status(429).json({ error: "请求过于频繁，请稍后再试。" });
-      return;
-    }
-
-    next();
-  };
-}
-
-function getStoredDailySummary(userId, dateKey) {
-  const row = db.prepare(`
-    SELECT provider, model, summary_json, source_fingerprint, generated_at
-    FROM ai_daily_summaries
-    WHERE user_id = ? AND date_key = ?
-  `).get(userId, dateKey);
-
-  if (!row) {
-    return null;
-  }
-
-  try {
-    return {
-      dateKey,
-      model: row.model,
-      source: row.provider,
-      generatedAt: row.generated_at,
-      sourceFingerprint: row.source_fingerprint,
-      summary: normalizeDailySummary(JSON.parse(row.summary_json))
-    };
-  } catch (error) {
-    db.prepare("DELETE FROM ai_daily_summaries WHERE user_id = ? AND date_key = ?").run(userId, dateKey);
-    return null;
-  }
-}
+app.use(createApiNotFoundHandler());
+app.use(createErrorHandler({ production: config.nodeEnv === "production" }));
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   app.listen(port, () => {
     console.log(`考研番茄钟 API 已启动：http://localhost:${port}`);
+    if (storageStatus.status === "ephemeral-risk") {
+      console.warn(`[数据持久化警告] ${storageStatus.message}`);
+    }
   });
-}
-
-function clampInteger(value, fallback, min, max) {
-  const numberValue = Number(value);
-
-  if (!Number.isFinite(numberValue)) {
-    return fallback;
-  }
-
-  return Math.min(Math.max(Math.floor(numberValue), min), max);
-}
-
-function normalizeDateKey(value) {
-  const candidate = String(value || "").trim();
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(candidate)) {
-    return candidate;
-  }
-
-  return new Date().toISOString().slice(0, 10);
-}
-
-function normalizeOptionalDateKey(value) {
-  const candidate = String(value || "").trim();
-
-  return /^\d{4}-\d{2}-\d{2}$/.test(candidate) ? candidate : null;
-}
-
-function normalizeRequiredTitle(value, maxLength) {
-  return String(value || "").trim().slice(0, maxLength);
-}
-
-function normalizePetId(value) {
-  return ["penguin", "purpleDragon", "greenDino", "chick"].includes(value) ? value : "penguin";
-}
-
-function normalizeOptionalString(value, maxLength) {
-  const cleanValue = String(value || "").trim();
-
-  if (!cleanValue) {
-    return null;
-  }
-
-  return cleanValue.slice(0, maxLength);
-}
-
-function normalizeTaskSource(value) {
-  const cleanValue = String(value || "").trim();
-  return ["ai", "review", "delayed", "carry"].includes(cleanValue) ? cleanValue : null;
 }
 
 function normalizeOwnedStudyGoalId(userId, value) {
@@ -930,24 +897,15 @@ function normalizeOwnedStudyGoalId(userId, value) {
   return goal ? goal.id : null;
 }
 
-function getNextLevelXP(level) {
-  return 100 + (level - 1) * 50;
-}
+function normalizeOwnedTaskId(userId, value) {
+  const taskId = normalizeOptionalString(value, 120);
 
-function getEvolutionStage(level) {
-  if (level >= 20) {
-    return 4;
+  if (!taskId) {
+    return null;
   }
 
-  if (level >= 10) {
-    return 3;
-  }
-
-  if (level >= 5) {
-    return 2;
-  }
-
-  return 1;
+  const task = db.prepare("SELECT id FROM tasks WHERE id = ? AND user_id = ?").get(taskId, userId);
+  return task ? task.id : null;
 }
 
 function getRangeStart(range) {
@@ -1012,7 +970,7 @@ function buildStatsSummary(days, totals) {
     activeDays: activeDays.length,
     averageDailyMinutes: days.length > 0 ? Math.round(totals.focusMinutes / days.length) : 0,
     averageActiveDayMinutes: activeDays.length > 0 ? Math.round(totals.focusMinutes / activeDays.length) : 0,
-    currentStreakDays: countTrailingActiveDays(days),
+    currentStreakDays: countCurrentStreakDays(days),
     bestDay: bestDay ? {
       date: bestDay.date,
       focusMinutes: bestDay.focusMinutes,
@@ -1021,299 +979,12 @@ function buildStatsSummary(days, totals) {
   };
 }
 
-function countTrailingActiveDays(days) {
-  let streak = 0;
-
-  for (let index = days.length - 1; index >= 0; index -= 1) {
-    if (days[index].focusMinutes <= 0) {
-      break;
-    }
-
-    streak += 1;
-  }
-
-  return streak;
-}
-
 function formatDateKey(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
-}
-
-function buildDailySummaryContext(userId, dateKey) {
-  const tasks = db.prepare(`
-    SELECT
-      id,
-      title,
-      completed,
-      completed_at AS completedAt,
-      created_at AS createdAt
-    FROM tasks
-    WHERE user_id = ? AND date_key = ?
-    ORDER BY created_at ASC
-  `).all(userId, dateKey).map((task) => ({
-    id: task.id,
-    title: task.title,
-    completed: Boolean(task.completed),
-    completedAt: task.completedAt,
-    createdAt: task.createdAt
-  }));
-
-  const focusSessions = db.prepare(`
-    SELECT
-      task_title AS taskTitle,
-      study_goal_id AS studyGoalId,
-      minutes,
-      started_at AS startedAt,
-      ended_at AS endedAt,
-      streak,
-      xp_earned AS xpEarned
-    FROM focus_sessions
-    WHERE user_id = ?
-      AND mode = 'focus'
-      AND date_key = ?
-    ORDER BY ended_at ASC
-  `).all(userId, dateKey).map((session) => ({
-    taskTitle: session.taskTitle,
-    studyGoalId: session.studyGoalId,
-    minutes: Number(session.minutes) || 0,
-    startedAt: session.startedAt,
-    endedAt: session.endedAt,
-    streak: Number(session.streak) || 0,
-    xpEarned: Number(session.xpEarned) || 0
-  }));
-
-  const studyGoals = db.prepare(`
-    SELECT
-      study_goals.id,
-      study_goals.title,
-      study_goals.target_minutes AS targetMinutes,
-      study_goals.target_date AS targetDate,
-      study_goals.completed,
-      COALESCE(SUM(CASE WHEN focus_sessions.mode = 'focus' THEN focus_sessions.minutes ELSE 0 END), 0) AS focusMinutes
-    FROM study_goals
-    LEFT JOIN focus_sessions
-      ON focus_sessions.study_goal_id = study_goals.id
-      AND focus_sessions.user_id = study_goals.user_id
-    WHERE study_goals.user_id = ?
-    GROUP BY study_goals.id
-    ORDER BY study_goals.completed ASC, study_goals.updated_at DESC
-    LIMIT 8
-  `).all(userId).map((goal) => {
-    const targetMinutes = Number(goal.targetMinutes) || 0;
-    const focusMinutes = Number(goal.focusMinutes) || 0;
-
-    return {
-      id: goal.id,
-      title: goal.title,
-      targetMinutes,
-      targetDate: goal.targetDate,
-      completed: Boolean(goal.completed),
-      focusMinutes,
-      progressPercent: targetMinutes > 0 ? Math.min(100, Math.round((focusMinutes / targetMinutes) * 100)) : 0
-    };
-  });
-
-  const user = db.prepare("SELECT display_name AS displayName FROM users WHERE id = ?").get(userId);
-  const pet = db.prepare("SELECT * FROM pets WHERE user_id = ?").get(userId);
-  const focusMinutes = focusSessions.reduce((total, session) => total + session.minutes, 0);
-  const completedTasks = tasks.filter((task) => task.completed).length;
-
-  return {
-    dateKey,
-    user: {
-      displayName: user?.displayName || "考研同学"
-    },
-    totals: {
-      completedFocusSessions: focusSessions.length,
-      focusMinutes,
-      xpEarned: focusSessions.reduce((total, session) => total + session.xpEarned, 0),
-      completedTasks,
-      plannedTasks: tasks.length
-    },
-    tasks,
-    focusSessions,
-    studyGoals,
-    pet: pet ? petFromRow(pet) : null
-  };
-}
-
-async function generateDailySummary(context) {
-  if (config.aiProvider === "deepseek") {
-    return generateDeepSeekDailySummary(context);
-  }
-
-  return generateOpenAiDailySummary(context);
-}
-
-async function generateOpenAiDailySummary(context) {
-  const response = await fetch(`${config.openaiBaseUrl.replace(/\/$/, "")}/responses`, {
-    method: "POST",
-    signal: AbortSignal.timeout(30000),
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.openaiApiKey}`
-    },
-    body: JSON.stringify({
-      model: config.openaiModel,
-      store: false,
-      max_output_tokens: 1000,
-      input: [
-        {
-          role: "system",
-          content: "你是一位温和、具体、擅长考研复习节奏管理的 AI 学习教练。请基于数据给出客观总结和可执行建议，不要编造不存在的学习内容。"
-        },
-        {
-          role: "user",
-          content: `请为这位考研学生生成当天学习总结和第二天建议。输出必须是中文 JSON，并严格符合给定 schema。学习数据：${JSON.stringify(context)}`
-        }
-      ],
-      text: {
-        format: {
-          type: "json_schema",
-          name: "daily_study_summary",
-          strict: true,
-          schema: {
-            type: "object",
-            additionalProperties: false,
-            required: ["title", "todaySummary", "highlights", "risks", "tomorrowPlan", "encouragement"],
-            properties: {
-              title: { type: "string" },
-              todaySummary: { type: "string" },
-              highlights: {
-                type: "array",
-                items: { type: "string" }
-              },
-              risks: {
-                type: "array",
-                items: { type: "string" }
-              },
-              tomorrowPlan: {
-                type: "array",
-                items: { type: "string" }
-              },
-              encouragement: { type: "string" }
-            }
-          }
-        }
-      }
-    })
-  });
-  const payload = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    const error = new Error(payload?.error?.message || payload?.error || "AI 总结生成失败。");
-    error.statusCode = response.status >= 500 ? 502 : response.status;
-    throw error;
-  }
-
-  try {
-    return normalizeDailySummary(JSON.parse(extractOpenAIText(payload)));
-  } catch (error) {
-    const parseError = new Error("AI 返回内容无法解析，请稍后重试。");
-    parseError.statusCode = 502;
-    throw parseError;
-  }
-}
-
-async function generateDeepSeekDailySummary(context) {
-  const response = await fetch(`${config.deepseekBaseUrl.replace(/\/$/, "")}/chat/completions`, {
-    method: "POST",
-    signal: AbortSignal.timeout(30000),
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.deepseekApiKey}`
-    },
-    body: JSON.stringify({
-      model: config.deepseekModel,
-      temperature: 0.4,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content: "你是一位温和、具体、擅长考研复习节奏管理的 AI 学习教练。请基于数据给出客观总结和可执行建议，不要编造不存在的学习内容。你必须只输出 JSON 对象，不要输出 Markdown。"
-        },
-        {
-          role: "user",
-          content: `请为这位考研学生生成当天学习总结和第二天建议。输出必须是中文 JSON 对象，字段必须包含 title、todaySummary、highlights、risks、tomorrowPlan、encouragement。highlights、risks、tomorrowPlan 必须是字符串数组。学习数据：${JSON.stringify(context)}`
-        }
-      ]
-    })
-  });
-  const payload = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    const error = new Error(payload?.error?.message || payload?.error || "AI 总结生成失败。");
-    error.statusCode = response.status >= 500 ? 502 : response.status;
-    throw error;
-  }
-
-  try {
-    return normalizeDailySummary(JSON.parse(extractDeepSeekText(payload)));
-  } catch (error) {
-    const parseError = new Error("AI 返回内容无法解析，请稍后重试。");
-    parseError.statusCode = 502;
-    throw parseError;
-  }
-}
-
-function extractOpenAIText(payload) {
-  if (typeof payload?.output_text === "string" && payload.output_text.trim()) {
-    return payload.output_text;
-  }
-
-  const content = (payload?.output || [])
-    .flatMap((item) => item.content || [])
-    .find((item) => typeof item.text === "string" && item.text.trim());
-
-  if (content?.text) {
-    return content.text;
-  }
-
-  throw new Error("OpenAI response did not include text output.");
-}
-
-function extractDeepSeekText(payload) {
-  const text = payload?.choices?.[0]?.message?.content;
-
-  if (typeof text === "string" && text.trim()) {
-    return text;
-  }
-
-  throw new Error("DeepSeek response did not include message content.");
-}
-
-function getAiApiKey() {
-  return config.aiProvider === "deepseek" ? config.deepseekApiKey : config.openaiApiKey;
-}
-
-function getAiModel() {
-  return config.aiProvider === "deepseek" ? config.deepseekModel : config.openaiModel;
-}
-
-function normalizeDailySummary(summary) {
-  return {
-    title: String(summary?.title || "今日学习复盘").trim().slice(0, 80),
-    todaySummary: String(summary?.todaySummary || "今天的学习记录已同步。").trim().slice(0, 500),
-    highlights: normalizeSummaryList(summary?.highlights, 4),
-    risks: normalizeSummaryList(summary?.risks, 3),
-    tomorrowPlan: normalizeSummaryList(summary?.tomorrowPlan, 5),
-    encouragement: String(summary?.encouragement || "稳住节奏，明天继续。").trim().slice(0, 240)
-  };
-}
-
-function normalizeSummaryList(value, maxItems) {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value
-    .map((item) => String(item || "").trim().slice(0, 180))
-    .filter(Boolean)
-    .slice(0, maxItems);
 }
 
 function toTaskRow(task) {
@@ -1331,6 +1002,7 @@ function toTaskRow(task) {
     source_date_key: task.sourceDateKey,
     suggested_for_date: task.suggestedForDate,
     ai_generated_at: task.aiGeneratedAt,
+    xp_earned: task.xpEarned,
     updated_at: task.updatedAt
   };
 }

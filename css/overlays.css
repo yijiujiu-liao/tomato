@@ -1,5 +1,3 @@
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -507,3 +505,4 @@ body.dark .focus-complete-card {
   to {
     transform: translateY(-4px) scale(1.06);
   }
+}

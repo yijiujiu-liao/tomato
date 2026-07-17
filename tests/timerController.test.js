@@ -17,6 +17,8 @@ test("timer controller enforces task-first start and owns mode settings", () => 
   let taskAvailable = false;
   let focused = false;
   let persisted = 0;
+  let confirmResult = false;
+  const confirmations = [];
   const controller = createTimerController({
     engine,
     modes: { focus: { minutes: 50, label: "专注" }, rest: { minutes: 5, label: "休息" } },
@@ -39,6 +41,10 @@ test("timer controller enforces task-first start and owns mode settings", () => 
     updateStartButton: () => {},
     runCloudSync: () => {},
     syncSettings: () => {},
+    confirmAbandon: (message) => {
+      confirmations.push(message);
+      return confirmResult;
+    },
   });
 
   assert.equal(controller.start(), false);
@@ -47,6 +53,13 @@ test("timer controller enforces task-first start and owns mode settings", () => 
   assert.equal(controller.start(), true);
   assert.equal(state.running, true);
   assert.equal(persisted, 1);
+  state.remainingSeconds = 2400;
+  controller.pause();
+  assert.equal(controller.abandon(), false);
+  assert.match(confirmations.at(-1), /记录不会保存/);
+  confirmResult = true;
+  assert.equal(controller.abandon(), true);
+  assert.equal(state.remainingSeconds, 3000);
   controller.switchMode("rest");
   assert.equal(state.mode, "rest");
   assert.equal(state.remainingSeconds, 300);

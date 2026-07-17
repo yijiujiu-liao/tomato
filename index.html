@@ -93,6 +93,7 @@
               <input id="homeQuickTaskInput" type="text" maxlength="60" placeholder="写下今天最重要的一件事" aria-label="快速添加今日任务">
               <button class="primary-btn" id="homeQuickTaskBtn" type="button">添加并专注</button>
             </div>
+            <button class="secondary-btn home-review-cta" id="homeReviewBtn" type="button" hidden>收束今天，生成明日计划</button>
           </section>
 
           <div id="todayTimerMount"></div>
@@ -282,19 +283,19 @@
               <div class="pet-progress-fill" id="petProgressFill"></div>
             </div>
             <div class="pet-xp-row">
-              <span id="petXPText">0 / 100 XP</span>
+              <strong id="petXPText">当前 0 / 100 XP</strong>
               <span id="evolutionHint">距离下一阶段还差 4 级</span>
             </div>
             <div class="pet-stats">
-              <span id="petTodayXP">今日 0 XP</span>
-              <span id="streakCount">今日连续 0</span>
-              <span id="petTotalXP">累计 0 XP</span>
+              <span><small>今日获得</small><strong id="petTodayXP">0 XP</strong></span>
+              <span><small>连续专注</small><strong id="streakCount">0 轮</strong></span>
+              <span><small>累计获得</small><strong id="petTotalXP">0 XP</strong></span>
             </div>
             <div class="pet-evolution-strip" aria-label="进化预览">
-              <span>Lv.1 幼体</span>
-              <span>Lv.5 成长期</span>
-              <span>Lv.10 进化体</span>
-              <span>Lv.20 完全体</span>
+              <span data-stage-level="1">Lv.1 幼体</span>
+              <span data-stage-level="5">Lv.5 成长期</span>
+              <span data-stage-level="10">Lv.10 进化体</span>
+              <span data-stage-level="20">Lv.20 完全体</span>
             </div>
           </section>
         </section>
@@ -403,6 +404,50 @@
             <span class="stat-label">今日专注总分钟数</span>
           </article>
         </section>
+      </section>
+
+      <section class="app-page focus-session-page" data-page="focus-session" aria-label="沉浸式专注页">
+        <div class="focus-session-shell" id="focusSessionShell" data-session-state="idle" data-mode="focus">
+          <button class="focus-session-back" id="focusSessionBackBtn" type="button" aria-label="退出本轮专注">
+            <span aria-hidden="true">&#8592;</span>
+          </button>
+
+          <header class="focus-session-heading">
+            <span id="focusSessionEyebrow">正在专注</span>
+            <h1 id="focusSessionTask">当前任务</h1>
+          </header>
+
+          <div class="focus-session-center">
+            <div class="focus-session-ring" id="focusSessionRing" aria-label="本轮专注进度">
+              <div class="focus-session-ring-inner">
+                <strong id="focusSessionTime" aria-live="polite">50:00</strong>
+                <span id="focusSessionProgress">本轮 0%</span>
+              </div>
+            </div>
+
+            <div class="focus-session-companion" aria-label="宠物陪伴状态">
+              <div class="focus-session-pet" id="focusSessionPet" aria-hidden="true"></div>
+              <div>
+                <strong id="focusSessionPetName">蓝莓企鹅陪你专注</strong>
+                <span id="focusSessionXp">当前 0 / 100 XP</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="focus-session-actions">
+            <button class="primary-btn focus-session-toggle" id="focusSessionToggleBtn" type="button">暂停</button>
+            <div class="focus-session-paused-actions" id="focusSessionPausedActions">
+              <button class="secondary-btn" id="focusSessionResetBtn" type="button">重置本轮</button>
+              <button class="focus-session-abandon" id="focusSessionAbandonBtn" type="button">放弃本轮</button>
+            </div>
+          </div>
+
+          <div class="focus-session-finish" id="focusSessionFinish" aria-hidden="true">
+            <span class="focus-session-finish-check" aria-hidden="true">&#10003;</span>
+            <strong>本轮专注完成</strong>
+            <small>正在结算今日番茄和宠物经验</small>
+          </div>
+        </div>
       </section>
     </div>
 

@@ -1,0 +1,11 @@
+.git
+.gitignore
+.env
+node_modules
+data
+backups
+promo-video
+tests
+*.log
+render.yaml
+README.md

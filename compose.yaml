@@ -1,0 +1,85 @@
+services:
+  app:
+    build:
+      context: .
+    image: tomato-app:local
+    container_name: tomato-app
+    init: true
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_PATH: /app/data/tomato.sqlite
+      SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-30}
+      TRUST_PROXY: "true"
+      ENFORCE_HTTPS: ${ENFORCE_HTTPS:-false}
+      AI_PROVIDER: ${AI_PROVIDER:-openai}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.5}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      TZ: Asia/Shanghai
+    volumes:
+      - tomato-data:/app/data
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: tomato-caddy
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  backup:
+    build:
+      context: .
+    image: tomato-app:local
+    container_name: tomato-backup
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    user: "0:0"
+    environment:
+      DATABASE_PATH: /app/data/tomato.sqlite
+      BACKUP_DIR: /app/backups
+      BACKUP_RETENTION: ${BACKUP_RETENTION:-14}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+    command:
+      - sh
+      - -c
+      - while true; do node scripts/backup-database.mjs; sleep "$${BACKUP_INTERVAL_SECONDS}"; done
+    volumes:
+      - tomato-data:/app/data:ro
+      - ./backups:/app/backups
+    logging:
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+volumes:
+  tomato-data:
+  caddy-data:
+  caddy-config:

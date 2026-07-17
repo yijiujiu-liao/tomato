@@ -38,3 +38,25 @@ test("AI review controller translates missing server configuration into user cop
   assert.equal(await controller.generate("2026-07-12"), false);
   assert.match(controller.getState().error, /AI 复盘尚未开启/);
 });
+
+test("AI review controller prevents duplicate generation while a request is active", async () => {
+  let releaseRequest;
+  let requestCount = 0;
+  const pending = new Promise((resolve) => { releaseRequest = resolve; });
+  const controller = createAiReviewController({
+    getRepository: () => ({
+      generateDailySummary: async () => {
+        requestCount += 1;
+        await pending;
+        return { summary: { tomorrowPlan: ["英语：精读一篇阅读"] } };
+      },
+    }),
+    isEnabled: () => true,
+  });
+
+  const firstRequest = controller.generate("2026-07-13", { auto: true });
+  assert.equal(await controller.generate("2026-07-13", { auto: true }), false);
+  assert.equal(requestCount, 1);
+  releaseRequest();
+  assert.equal(await firstRequest, true);
+});

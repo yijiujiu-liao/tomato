@@ -44,9 +44,14 @@ export function createPetPageView(elements) {
     elements.evolutionHint.textContent = nextStage
       ? `下一阶段还差 ${nextStage.xp} XP / 约 ${nextStage.tomatoes} 个番茄`
       : getEvolutionHint(progress.level);
-    elements.todayXP.textContent = `今日 ${todayXP} XP`;
-    elements.streak.textContent = `今日连续 ${streak}`;
-    elements.totalXP.textContent = `累计 ${progress.totalXP} XP`;
+    elements.todayXP.textContent = `${todayXP} XP`;
+    elements.streak.textContent = `${streak} 轮`;
+    elements.totalXP.textContent = `${progress.totalXP} XP`;
+    elements.shell.closest(".pet-panel")?.querySelectorAll("[data-stage-level]").forEach((item) => {
+      const stageLevel = Number(item.dataset.stageLevel);
+      item.dataset.unlocked = String(progress.level >= stageLevel);
+      item.dataset.current = String(stageLevel === evolutionStage.minLevel);
+    });
   }
 
   function renderEvolutionPreview({ progress, selectedPet }) {

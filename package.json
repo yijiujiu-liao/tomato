@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node server/index.js",
-    "dev": "node --watch server/index.js",
-    "check": "node scripts/check-syntax.mjs",
+    "start": "node --env-file-if-exists=.env server/index.js",
+    "dev": "node --env-file-if-exists=.env --watch server/index.js",
+    "backup": "node --env-file-if-exists=.env scripts/backup-database.mjs",
+    "check": "node scripts/check-syntax.mjs && node scripts/check-css.mjs",
     "seed:demo": "node scripts/seed-demo-data.mjs",
     "test": "node --test"
   },

@@ -24,6 +24,7 @@ export function createFocusFlowController({
   openCompletion,
   closeCompletion,
   buildCompletionMessage,
+  scheduleCompletion = (open) => open(),
 }) {
   let pendingRestType = "";
 
@@ -68,7 +69,7 @@ export function createFocusFlowController({
     showPetReward(result.reward);
     setStatus(buildCompletionMessage(result.reward, result.nextRestType));
     pendingRestType = result.nextRestType;
-    openCompletion(result.reward, result.nextRestType);
+    scheduleCompletion(() => openCompletion(result.reward, result.nextRestType));
     return { mode: "focus", ...result };
   }
 

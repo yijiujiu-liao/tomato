@@ -66,6 +66,22 @@ export function sortExecutableTasks(tasks, currentTaskId = "") {
   });
 }
 
+export function resolveExecutableTaskSelection(tasks, currentTaskId = "") {
+  const executableTasks = sortExecutableTasks(
+    tasks.filter((task) => !task.completed),
+    currentTaskId,
+  );
+  const selectedTask = executableTasks.find((task) => task.id === currentTaskId)
+    || executableTasks[0]
+    || null;
+  const nextTaskId = selectedTask?.id || "";
+
+  return {
+    task: selectedTask,
+    changed: nextTaskId !== currentTaskId,
+  };
+}
+
 export function createLocalTask({ title, id = createClientId("task"), now = new Date(), ...metadata }) {
   const cleanTitle = String(title || "").trim().slice(0, 60);
   if (!cleanTitle) return null;

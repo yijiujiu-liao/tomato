@@ -27,11 +27,15 @@ import {
   getAiTomorrowAdoptionState,
   getAiTomorrowSuggestions
 } from "./js/aiReview.js";
-import { renderHomePage as renderHomePageView } from "./js/pages/home.js";
+import {
+  addTaskAndStartFocus,
+  renderHomePage as renderHomePageView
+} from "./js/pages/home.js";
 import { createTasksPageController } from "./js/pages/tasks.js";
 import { buildReviewModel, renderRecordsView, renderReviewPageView } from "./js/pages/review.js";
 import { createPetPageView } from "./js/pages/pet.js";
 import { createDataPageView } from "./js/pages/data.js";
+import { createFocusSessionPageView } from "./js/pages/focusSession.js";
 import { normalizeStudyGoal, sortStudyGoals } from "./js/goals.js";
 import {
   inferTodayPetXP,
@@ -39,23 +43,24 @@ import {
 } from "./js/focusRecords.js";
 import {
   addUniqueTask,
+  resolveExecutableTaskSelection,
   sortExecutableTasks
 } from "./js/tasks.js";
 import { createTaskStore } from "./js/taskStore.js";
 import { createTodayStore } from "./js/todayStore.js";
 import { clearTodaySessionData, completeFocusSession } from "./js/focusSession.js";
 import { createFocusFlowController } from "./js/focusFlowController.js";
+import { createFocusSessionController } from "./js/focusSessionController.js";
 import { createStudySyncController } from "./js/studySyncController.js";
 import { createPetController } from "./js/petController.js";
 import { createTaskController } from "./js/taskController.js";
 import { createTimerController } from "./js/timerController.js";
+import { createActiveTimerController } from "./js/activeTimerController.js";
+import { createCloudStatsController } from "./js/cloudStatsController.js";
 import { createGoalController } from "./js/goalController.js";
 import { createCloudStateApplier } from "./js/cloudState.js";
 import { placeSettingsUtilities, setupAppLayout } from "./js/components/appLayout.js";
-import {
-  createActiveTimerSnapshot,
-  restoreActiveTimerSnapshot
-} from "./js/timer.js";
+import { createCurrentGoalView } from "./js/components/currentGoal.js";
 import { createTimerEngine } from "./js/timerEngine.js";
 import {
   loadStudyGoals as readStudyGoals,
@@ -75,7 +80,6 @@ import {
   DEFAULT_GOAL,
   MODES,
   REST_DURATIONS,
-  STATS_RANGES,
   STORAGE_KEY,
   STUDY_GOALS_KEY
 } from "./js/state.js";
@@ -110,6 +114,7 @@ const homeNextTaskHint = document.querySelector("#homeNextTaskHint");
 const homeQuickTask = document.querySelector("#homeQuickTask");
 const homeQuickTaskInput = document.querySelector("#homeQuickTaskInput");
 const homeQuickTaskBtn = document.querySelector("#homeQuickTaskBtn");
+const homeReviewBtn = document.querySelector("#homeReviewBtn");
 const aiPlanBanner = document.querySelector("#aiPlanBanner");
 const aiPlanBannerTitle = document.querySelector("#aiPlanBannerTitle");
 const aiPlanBannerText = document.querySelector("#aiPlanBannerText");
@@ -119,7 +124,6 @@ const homeInsightsBtn = document.querySelector("#homeInsightsBtn");
 const focusDurationInput = document.querySelector("#focusDurationInput");
 const restDurationSelect = document.querySelector("#restDurationSelect");
 const currentTaskSelect = document.querySelector("#currentTaskSelect");
-let currentGoalSelect = null;
 const todayDateText = document.querySelector("#todayDateText");
 const planProgressText = document.querySelector("#planProgressText");
 const planExpandBtn = document.querySelector("#planExpandBtn");
@@ -176,6 +180,20 @@ const reviewEncouragementText = document.querySelector("#reviewEncouragementText
 const reviewAdoptBtn = document.querySelector("#reviewAdoptBtn");
 const restTypeLabel = document.querySelector("#restTypeLabel");
 const restCopy = document.querySelector("#restCopy");
+const focusSessionShell = document.querySelector("#focusSessionShell");
+const focusSessionBackBtn = document.querySelector("#focusSessionBackBtn");
+const focusSessionEyebrow = document.querySelector("#focusSessionEyebrow");
+const focusSessionTask = document.querySelector("#focusSessionTask");
+const focusSessionRing = document.querySelector("#focusSessionRing");
+const focusSessionTime = document.querySelector("#focusSessionTime");
+const focusSessionProgress = document.querySelector("#focusSessionProgress");
+const focusSessionPet = document.querySelector("#focusSessionPet");
+const focusSessionPetName = document.querySelector("#focusSessionPetName");
+const focusSessionXp = document.querySelector("#focusSessionXp");
+const focusSessionToggleBtn = document.querySelector("#focusSessionToggleBtn");
+const focusSessionResetBtn = document.querySelector("#focusSessionResetBtn");
+const focusSessionAbandonBtn = document.querySelector("#focusSessionAbandonBtn");
+const focusSessionFinish = document.querySelector("#focusSessionFinish");
 const appRoot = document.querySelector("#appRoot");
 const authGate = document.querySelector("#authGate");
 const authGateForm = document.querySelector("#authGateForm");
@@ -209,6 +227,20 @@ const timerPanelView = createTimerPanel({
   },
   onModeChange: switchMode
 });
+const focusSessionPageView = createFocusSessionPageView({
+  shell: focusSessionShell,
+  eyebrow: focusSessionEyebrow,
+  task: focusSessionTask,
+  ring: focusSessionRing,
+  time: focusSessionTime,
+  progress: focusSessionProgress,
+  pet: focusSessionPet,
+  petName: focusSessionPetName,
+  xp: focusSessionXp,
+  toggle: focusSessionToggleBtn,
+  finish: focusSessionFinish,
+});
+let focusSessionController = null;
 const taskSwipeController = createTaskSwipeController({
   onComplete: completeTaskWithAnimation,
   onDelay: delayTaskToTomorrow,
@@ -237,6 +269,7 @@ const appNavigator = createAppNavigator({
   pages: appPages,
   buttons: pageButtons,
   onPageChange: handlePageChange,
+  canNavigate: (transition) => focusSessionController?.canNavigate(transition) ?? true,
 });
 const settingsDrawerView = createDrawer({
   root: settingsDrawer,
@@ -331,19 +364,33 @@ const aiReviewController = createAiReviewController({
 let dataPageView = null;
 let studyGoalsPanel = null;
 let studyGoalsView = null;
-let aiSummaryPanel = null;
+let currentGoalView = null;
 let aiSummaryView = null;
-let cloudStats = {
-  range: "week",
-  status: "idle",
-  data: null,
-  error: ""
-};
 
 let focusFlowController = null;
 
 const todayStore = createTodayStore({ storage: localStorage, key: STORAGE_KEY, getDateKey });
 let todayData = todayStore.load();
+const cloudStatsController = createCloudStatsController({
+  isEnabled: isCloudSyncEnabled,
+  fetchStats: (range) => cloudRepository.fetchStats(range),
+  getView: () => dataPageView,
+  getLocalTotals: () => ({
+    completedCount: todayData.completedCount,
+    focusMinutes: todayData.focusMinutes,
+    totalXP: todayData.petProgress.totalXP,
+    dailyGoal: todayData.dailyGoal,
+  }),
+});
+const activeTimerController = createActiveTimerController({
+  engine: timerEngine,
+  getData: () => todayData,
+  getTodayKey,
+  getDateKey,
+  save: saveTodayData,
+  setStatus: (message) => { statusText.textContent = message; },
+  onExpired: () => finishCurrentMode({ silent: true }),
+});
 const taskStore = createTaskStore({
   storage: localStorage,
   plansKey: DAILY_PLANS_KEY,
@@ -460,8 +507,8 @@ const timerController = createTimerController({
   restDurationSelect,
   unlockAudio,
   requestNotificationPermission,
-  clearActiveTimer: clearActiveTimerState,
-  persistActiveTimer: persistActiveTimerState,
+  clearActiveTimer: activeTimerController.clear,
+  persistActiveTimer: activeTimerController.persist,
   closeCompletion: closeFocusCompleteModal,
   clearPendingRest: () => focusFlowController?.clearPendingRest(),
   setRestType,
@@ -470,6 +517,17 @@ const timerController = createTimerController({
   updateStartButton: updateStartButtonState,
   runCloudSync,
   syncSettings: syncSettingsToCloud,
+});
+focusSessionController = createFocusSessionController({
+  engine: timerEngine,
+  modes: MODES,
+  timerController,
+  navigate: switchPage,
+  prepareStart: () => {
+    if (Number(focusDurationInput.value) !== todayData.focusDuration) {
+      timerController.updateFocusDuration();
+    }
+  },
 });
 focusFlowController = createFocusFlowController({
   engine: timerEngine,
@@ -496,7 +554,7 @@ focusFlowController = createFocusFlowController({
   syncPet: syncPetToCloud,
   syncSettings: syncSettingsToCloud,
   pullCloudState,
-  refreshStats: () => fetchCloudStats(cloudStats.range, { silent: true }),
+  refreshStats: () => cloudStatsController.load(cloudStatsController.getRange(), { silent: true }),
   generateAiSummary: () => fetchDailyAiSummary({ auto: true }),
   playFinishSound,
   showNotification,
@@ -508,19 +566,26 @@ focusFlowController = createFocusFlowController({
   openCompletion: openFocusCompleteModal,
   closeCompletion: closeFocusCompleteModal,
   buildCompletionMessage: buildFocusCompleteMessage,
+  scheduleCompletion: (open) => {
+    if (getPageFromLocation() !== "focus-session") {
+      open();
+      return;
+    }
+    focusSessionPageView.showCompletion().then(open);
+  },
 });
 
 MODES.focus.minutes = todayData.focusDuration;
 MODES.rest.minutes = getRestMinutes();
 timerEngine.setMode("focus", MODES.focus.minutes * 60);
-restoreActiveTimerState();
+activeTimerController.restore();
 focusDurationInput.value = todayData.focusDuration;
 restDurationSelect.value = normalizeRestType(todayData.nextRestType);
 goalInput.value = todayData.dailyGoal;
 applyTheme(todayData.theme);
 setupTodayPageLayout();
 render();
-switchPage(getPageFromLocation(), { fromHistory: true });
+switchPage(getInitialPage(), { fromHistory: true, force: true });
 setupAiSummaryUI();
 setupCloudStatsUI();
 setupStudyGoalsUI();
@@ -551,6 +616,7 @@ currentTaskSelect.addEventListener("change", updateCurrentTaskSelection);
 addTaskBtn.addEventListener("click", handleAddTask);
 newTaskInput.addEventListener("keydown", handleNewTaskKeydown);
 homeQuickTaskBtn?.addEventListener("click", handleHomeQuickTask);
+homeReviewBtn?.addEventListener("click", () => switchPage("review"));
 homeQuickTaskInput?.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     handleHomeQuickTask();
@@ -565,11 +631,16 @@ petModal.addEventListener("click", handlePetModalBackdrop);
 focusCompleteModal.addEventListener("click", handleFocusCompleteModalBackdrop);
 startRestFromModalBtn.addEventListener("click", startRestFromCompletionModal);
 skipRestFromModalBtn.addEventListener("click", skipRestFromCompletionModal);
+focusSessionBackBtn.addEventListener("click", exitFocusSession);
+focusSessionToggleBtn.addEventListener("click", toggleFocusSessionTimer);
+focusSessionResetBtn.addEventListener("click", resetFocusSession);
+focusSessionAbandonBtn.addEventListener("click", abandonFocusSession);
 reviewAdoptBtn?.addEventListener("click", adoptReviewTomorrowTask);
 document.addEventListener("keydown", handleDocumentKeydown);
 document.addEventListener("visibilitychange", () => {
   if (timerEngine.isRunning()) timerEngine.tick();
 });
+window.addEventListener("beforeunload", handleBeforeUnload);
 
 goalInput.addEventListener("input", () => {
   const nextGoal = Number(goalInput.value);
@@ -635,7 +706,7 @@ function refreshAuthUI() {
     setSyncStatus("已开启云端同步");
   }
 
-  renderCloudStats();
+  cloudStatsController.render();
 }
 
 function toggleAuthMode() {
@@ -657,14 +728,8 @@ async function logoutFromCloud() {
 }
 
 function resetCloudAccountState() {
-  cloudStats = {
-    range: cloudStats.range,
-    status: "idle",
-    data: null,
-    error: ""
-  };
+  cloudStatsController.reset();
   aiReviewController.reset();
-  renderCloudStats();
   setSyncStatus("已回到本地模式");
 }
 
@@ -689,7 +754,7 @@ async function performFullCloudSync(message = "正在同步...", options = {}) {
     setStatus: setSyncStatus,
     pull: pullCloudState,
     push: syncLocalStateToCloud,
-    refreshStats: () => fetchCloudStats(cloudStats.range, { silent: true }),
+    refreshStats: () => cloudStatsController.load(cloudStatsController.getRange(), { silent: true }),
     loadAi: loadStoredAiSummary,
     onSynced: markCloudSynced,
     onRefresh: () => {
@@ -731,57 +796,9 @@ function setupCloudStatsUI() {
   if (!insightsPage) return;
   dataPageView = createDataPageView({
     page: insightsPage,
-    onRangeChange: fetchCloudStats,
+    onRangeChange: cloudStatsController.load,
   });
-  renderCloudStats();
-}
-
-async function fetchCloudStats(range = cloudStats.range, options = {}) {
-  cloudStats.range = STATS_RANGES[range] ? range : "week";
-
-  if (!isCloudSyncEnabled()) {
-    cloudStats.status = "idle";
-    cloudStats.data = null;
-    cloudStats.error = "";
-    renderCloudStats();
-    return;
-  }
-
-  try {
-    cloudStats.status = options.silent ? cloudStats.status : "loading";
-    cloudStats.error = "";
-    renderCloudStats();
-
-    const data = await cloudRepository.fetchStats(cloudStats.range);
-    cloudStats = {
-      range: cloudStats.range,
-      status: "ready",
-      data,
-      error: ""
-    };
-  } catch (error) {
-    cloudStats = {
-      range: cloudStats.range,
-      status: "error",
-      data: cloudStats.data,
-      error: error.message
-    };
-  }
-
-  renderCloudStats();
-}
-
-function renderCloudStats() {
-  dataPageView?.renderStats({
-    cloudEnabled: isCloudSyncEnabled(),
-    stats: cloudStats,
-    localTotals: {
-      completedCount: todayData.completedCount,
-      focusMinutes: todayData.focusMinutes,
-      totalXP: todayData.petProgress.totalXP,
-      dailyGoal: todayData.dailyGoal,
-    },
-  });
+  cloudStatsController.render();
 }
 
 function setupStudyDiagnosisUI() {
@@ -808,9 +825,9 @@ function setupAiSummaryUI() {
     reviewPage,
     onGenerate: () => fetchDailyAiSummary({ force: true }),
     onAdopt: adoptAiTomorrowPlan,
+    onOpenAccount: openSettingsDrawer,
     formatGeneratedAt: formatAiGeneratedAt
   });
-  aiSummaryPanel = aiSummaryView.panel;
   renderAiSummary();
 }
 
@@ -904,20 +921,10 @@ function renderStudyGoals() {
 
 function setupCurrentGoalUI() {
   const settingsBody = document.querySelector(".focus-round-settings-body");
-
-  if (!settingsBody) {
-    return;
-  }
-
-  const wrapper = document.createElement("div");
-  wrapper.className = "current-goal-setting";
-  wrapper.innerHTML = `
-    <label for="currentGoalSelect">当前目标</label>
-    <select id="currentGoalSelect" aria-label="选择当前学习目标"></select>
-  `;
-  settingsBody.appendChild(wrapper);
-  currentGoalSelect = wrapper.querySelector("#currentGoalSelect");
-  currentGoalSelect.addEventListener("change", updateCurrentGoalSelection);
+  currentGoalView = createCurrentGoalView({
+    mount: settingsBody,
+    onChange: updateCurrentGoalSelection,
+  });
   updateCurrentGoalOptions();
 }
 
@@ -983,7 +990,7 @@ function runCloudSync(action) {
 }
 
 function startTimer() {
-  return timerController.start();
+  return focusSessionController.start();
 }
 
 function pauseTimer() {
@@ -1104,26 +1111,12 @@ function updateCurrentTaskOptions() {
 }
 
 function updateCurrentGoalOptions() {
-  if (!currentGoalSelect) {
-    return;
-  }
-
-  const activeGoals = studyGoals.filter((goal) => !goal.completed);
-  const selectedGoalExists = activeGoals.some((goal) => goal.id === todayData.currentStudyGoalId);
-
-  if (todayData.currentStudyGoalId && !selectedGoalExists) {
+  if (!currentGoalView) return;
+  const result = currentGoalView.render(studyGoals, todayData.currentStudyGoalId);
+  if (result.changed) {
     todayData.currentStudyGoalId = "";
     saveTodayData();
   }
-
-  currentGoalSelect.innerHTML = "";
-  currentGoalSelect.appendChild(createTaskOption("", activeGoals.length ? "暂未选择目标" : "暂无进行中目标"));
-
-  activeGoals.forEach((goal) => {
-    currentGoalSelect.appendChild(createTaskOption(goal.id, goal.title));
-  });
-
-  currentGoalSelect.value = selectedGoalExists ? todayData.currentStudyGoalId : "";
 }
 
 function completeTaskWithAnimation(taskId) {
@@ -1162,15 +1155,18 @@ function handleAddTask() {
 
 function handleHomeQuickTask() {
   const title = homeQuickTaskInput?.value.trim() || "";
+  const result = addTaskAndStartFocus({
+    title,
+    addTask,
+    startFocus: startTimer,
+  });
 
-  if (!addTask(title)) {
+  if (!result.added) {
     homeQuickTaskInput?.focus();
     return;
   }
 
   homeQuickTaskInput.value = "";
-  statusText.textContent = "任务已选好，可以开始这一轮专注。";
-  startBtn.focus();
 }
 
 function handleNewTaskKeydown(event) {
@@ -1183,8 +1179,8 @@ function updateCurrentTaskSelection() {
   return taskController.select(currentTaskSelect.value);
 }
 
-function updateCurrentGoalSelection() {
-  const goal = studyGoals.find((item) => item.id === currentGoalSelect.value);
+function updateCurrentGoalSelection(goalId) {
+  const goal = studyGoals.find((item) => item.id === goalId);
 
   todayData.currentStudyGoalId = goal ? goal.id : "";
   saveTodayData();
@@ -1203,30 +1199,54 @@ function createStudyGoalId() {
   return createClientId("goal");
 }
 
-function createTaskOption(value, text) {
-  const option = document.createElement("option");
-
-  option.value = value;
-  option.textContent = text;
-  return option;
-}
-
 function switchPage(pageName, options = {}) {
   return appNavigator.switchPage(pageName, options);
 }
 
 function handlePageChange(pageName) {
-  if (pageName === "data" && isCloudSyncEnabled() && cloudStats.status === "idle") {
-    fetchCloudStats(cloudStats.range);
+  if (pageName === "data" && isCloudSyncEnabled() && cloudStatsController.isIdle()) {
+    cloudStatsController.load();
   }
 
   if (pageName === "review") {
     renderReviewPage();
+    const aiState = aiReviewController.getState();
+    if (isCloudSyncEnabled() && todayData.completedCount > 0 && aiState.status === "idle") {
+      fetchDailyAiSummary({ auto: true });
+    }
   }
 }
 
 function getPageFromLocation() {
   return appNavigator.getCurrentPage();
+}
+
+function getInitialPage() {
+  return focusSessionController.getInitialPage(getPageFromLocation());
+}
+
+function handleBeforeUnload(event) {
+  if (getPageFromLocation() !== "focus-session" || !focusSessionController.hasInProgressSession()) {
+    return;
+  }
+  event.preventDefault();
+  event.returnValue = "";
+}
+
+function exitFocusSession() {
+  focusSessionController.exit();
+}
+
+function toggleFocusSessionTimer() {
+  focusSessionController.toggle();
+}
+
+function resetFocusSession() {
+  focusSessionController.reset();
+}
+
+function abandonFocusSession() {
+  focusSessionController.abandon();
 }
 
 function handlePetShellKeydown(event) {
@@ -1292,15 +1312,24 @@ function closeFocusCompleteModal() {
 }
 
 function startRestFromCompletionModal() {
-  return focusFlowController.startRest();
+  const restType = focusFlowController.startRest();
+  timerController.start();
+  switchPage("focus-session", { force: true });
+  return restType;
 }
 
 function skipRestFromCompletionModal() {
-  return focusFlowController.skipRest();
+  const result = focusFlowController.skipRest();
+  switchPage("home", { force: true });
+  return result;
 }
 
 function finishCurrentMode(options = {}) {
-  return focusFlowController.finish(options);
+  const result = focusFlowController.finish(options);
+  if (result.mode === "rest") {
+    switchPage("home", { force: true });
+  }
+  return result;
 }
 
 function clearTodayRecords() {
@@ -1355,28 +1384,12 @@ function ensureCurrentTaskSelection() {
     return;
   }
 
-  const unfinishedTasks = sortExecutableTasks(
-    getTodayTasks().filter((task) => !task.completed),
-    todayData.currentTaskId
-  );
-  const selectedTaskExists = unfinishedTasks.some((task) => task.id === todayData.currentTaskId);
-  let changed = false;
+  const selection = resolveExecutableTaskSelection(getTodayTasks(), todayData.currentTaskId);
+  if (!selection.changed) return;
 
-  if (todayData.currentTaskId && !selectedTaskExists) {
-    todayData.currentTaskId = "";
-    todayData.currentTask = "";
-    changed = true;
-  }
-
-  if (!todayData.currentTaskId && unfinishedTasks.length > 0) {
-    todayData.currentTaskId = unfinishedTasks[0].id;
-    todayData.currentTask = unfinishedTasks[0].title;
-    changed = true;
-  }
-
-  if (changed) {
-    saveTodayData();
-  }
+  todayData.currentTaskId = selection.task?.id || "";
+  todayData.currentTask = selection.task?.title || "";
+  saveTodayData();
 }
 
 function renderHomePage() {
@@ -1392,6 +1405,7 @@ function renderHomePage() {
       homeNextTaskTitle,
       homeNextTaskHint,
       homeQuickTask,
+      homeReviewBtn,
       homePetArt,
       homePetProgressFill,
       homePetNextHint,
@@ -1416,6 +1430,15 @@ function renderTimerAndProgress() {
     running: timerState.running,
     restType: todayData.nextRestType,
     restMinutes: MODES.rest.minutes
+  });
+  focusSessionPageView.render({
+    mode: timerState.mode,
+    remainingSeconds: timerState.remainingSeconds,
+    totalSeconds,
+    running: timerState.running,
+    taskTitle: todayData.currentTask,
+    progress: todayData.petProgress,
+    selectedPet: todayData.selectedPet,
   });
 }
 
@@ -1465,7 +1488,7 @@ function ensureStartableFocusTask() {
 function renderStats() {
   dataPageView?.renderTodayStats(todayData);
   renderStudyDiagnosis();
-  renderCloudStats();
+  cloudStatsController.render();
   renderAiSummary();
 }
 
@@ -1543,58 +1566,6 @@ function showPetReward(result) {
 
 function pauseTimerSilently() {
   return timerController.pauseSilently();
-}
-
-function persistActiveTimerState() {
-  const timerState = timerEngine.getState();
-  todayData.activeTimer = createActiveTimerSnapshot({
-    date: todayData.date,
-    mode: timerState.mode,
-    endsAt: timerState.endsAt
-  });
-  saveTodayData(false);
-}
-
-function clearActiveTimerState() {
-  if (!todayData.activeTimer) {
-    return;
-  }
-
-  todayData.activeTimer = null;
-  saveTodayData(false);
-}
-
-function restoreActiveTimerState() {
-  const restored = restoreActiveTimerSnapshot(todayData.activeTimer, {
-    todayKey: getTodayKey(),
-    getDateKey
-  });
-
-  if (restored.status === "invalid") {
-    todayData.activeTimer = null;
-    return;
-  }
-
-  if (restored.status === "outdated") {
-    todayData.activeTimer = null;
-    saveTodayData(false);
-    timerEngine.stop();
-    return;
-  }
-
-  timerEngine.setMode(restored.mode, restored.remainingSeconds);
-
-  if (restored.status === "running") {
-    timerEngine.resume(restored.endsAt);
-    statusText.textContent = restored.mode === "focus"
-      ? "已恢复正在进行的专注，倒计时按真实时间继续。"
-      : "已恢复休息倒计时。";
-    return;
-  }
-
-  todayData.activeTimer = null;
-  saveTodayData(false);
-  queueMicrotask(() => finishCurrentMode({ silent: true }));
 }
 
 function getRestMinutes(restType = todayData?.nextRestType) {

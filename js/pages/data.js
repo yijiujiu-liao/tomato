@@ -1,4 +1,8 @@
-import { buildStudyDiagnostics } from "../components/diagnostics.js";
+import {
+  buildStudyDiagnosticItems,
+  buildStudyDiagnostics,
+  getPrimaryStudyDiagnostic,
+} from "../components/diagnostics.js";
 import { renderCloudStatMetric } from "../components/stats.js";
 import { STATS_RANGES } from "../state.js";
 import { escapeHtml } from "../utils.js";
@@ -37,8 +41,13 @@ export function createDataPageView({ page, onRangeChange }) {
       <div><p class="stats-kicker">节奏诊断</p><h2>今天的问题在哪里</h2></div>
       <span class="diagnosis-chip">直接一点</span>
     </div>
+    <article class="diagnosis-lead" id="studyDiagnosisLead" data-level="warn">
+      <span>当前结论</span>
+      <strong>先完成第一轮专注</strong>
+      <p>有了第一条记录后，系统才能判断今天的执行节奏。</p>
+    </article>
     <details class="diagnosis-details">
-      <summary>查看具体诊断</summary>
+      <summary>查看 4 项诊断依据</summary>
       <div class="diagnosis-list" id="studyDiagnosisList"></div>
     </details>
   `;
@@ -101,6 +110,15 @@ export function createDataPageView({ page, onRangeChange }) {
   }
 
   function renderDiagnosis(context) {
+    const items = buildStudyDiagnosticItems({
+      ...context,
+      inferSubject,
+    });
+    const primary = getPrimaryStudyDiagnostic(items);
+    const lead = diagnosisPanel.querySelector("#studyDiagnosisLead");
+    lead.dataset.level = primary.level;
+    lead.querySelector("strong").textContent = primary.title;
+    lead.querySelector("p").textContent = primary.text;
     diagnosisPanel.querySelector("#studyDiagnosisList").innerHTML = buildStudyDiagnostics({
       ...context,
       inferSubject,

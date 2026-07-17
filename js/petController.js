@@ -1,6 +1,7 @@
 import {
   addPetExperience,
   createPetProgress,
+  createPetProgressFromTotalXP,
   getEvolutionStage,
   normalizePetType,
   removePetExperience,
@@ -14,8 +15,7 @@ export function createPetController({ getData, save }) {
     const data = getData();
     const petId = normalizePetType(typeKey);
     data.selectedPet = petId;
-    data.petProgress = createPetProgress(petId);
-    data.todayPetXP = 0;
+    data.petProgress = createPetProgressFromTotalXP(data.petProgress?.totalXP, petId);
     save();
     return { petId, name: PET_TYPES[petId].name };
   }

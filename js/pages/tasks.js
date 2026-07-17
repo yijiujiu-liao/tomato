@@ -56,6 +56,8 @@ export function createTasksPageController({
     if (task.completed) {
       item.querySelector('[data-action="restore"]')?.addEventListener("click", () => onRestore(task.id));
     } else {
+      item.querySelector('[data-action="complete"]')?.addEventListener("click", () => onComplete(task.id));
+      item.querySelector('[data-action="delay"]')?.addEventListener("click", () => onDelay(task.id));
       const front = item.querySelector(".task-card-front");
       front.addEventListener("click", (event) => {
         if (front.dataset.ignoreClick !== "true" && !event.target.closest("button, summary, details")) onFocus(task.id);

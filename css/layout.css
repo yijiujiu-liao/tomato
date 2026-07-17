@@ -1,5 +1,3 @@
-}
-
 button,
 input,
 select {
@@ -444,6 +442,20 @@ body.dark .today-stack .timer-card {
   display: none;
 }
 
+.home-review-cta {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 14px;
+  border: 1px solid rgba(37, 99, 90, 0.16);
+  background: rgba(255, 255, 255, 0.54);
+}
+
+.home-review-cta[hidden] {
+  display: none;
+}
+
 .home-quick-task input,
 .home-quick-task button {
   min-height: 48px;
@@ -680,3 +692,4 @@ body[data-page="home"].show-full-plan [data-task-group="completed"] {
     opacity: 1;
     transform: translateY(0);
   }
+}

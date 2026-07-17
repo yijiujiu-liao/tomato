@@ -1,5 +1,3 @@
-}
-
 .card,
 .stat-card {
   border: 1px solid var(--line);
@@ -1125,6 +1123,72 @@ select:focus {
   background: rgba(255, 255, 255, 0.64);
 }
 
+.ai-diagnosis-card {
+  position: relative;
+  overflow: hidden;
+  padding: 18px;
+  border: 1px solid rgba(37, 99, 90, 0.2);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(242, 194, 90, 0.24), transparent 36%),
+    linear-gradient(145deg, rgba(37, 99, 90, 0.12), rgba(255, 255, 255, 0.62));
+}
+
+body.dark .ai-diagnosis-card {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(233, 154, 87, 0.14), transparent 38%),
+    linear-gradient(145deg, rgba(121, 187, 170, 0.13), rgba(29, 40, 37, 0.76));
+}
+
+.ai-diagnosis-card > span {
+  display: block;
+  color: var(--brand);
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.ai-diagnosis-card h3 {
+  margin: 7px 0 8px;
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 950;
+  line-height: 1.35;
+  letter-spacing: -0.035em;
+}
+
+.ai-diagnosis-card > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 720;
+  line-height: 1.65;
+}
+
+.ai-diagnosis-card > div {
+  display: grid;
+  gap: 4px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  color: #fff;
+  background: var(--brand);
+}
+
+.ai-diagnosis-card strong {
+  font-size: 11px;
+  font-weight: 900;
+  opacity: 0.78;
+}
+
+.ai-diagnosis-card em {
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1.45;
+}
+
 .ai-summary-main {
   padding: 18px;
 }
@@ -1182,6 +1246,15 @@ select:focus {
   background:
     linear-gradient(135deg, rgba(37, 99, 90, 0.12), rgba(242, 194, 90, 0.18)),
     var(--soft);
+}
+
+.ai-follow-through-note {
+  margin: -4px 4px 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.55;
+  text-align: center;
 }
 
 .ai-summary-loading {
@@ -1414,3 +1487,4 @@ select:focus {
   background: var(--soft);
   font-size: 14px;
   font-weight: 800;
+}

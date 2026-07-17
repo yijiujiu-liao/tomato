@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -7,7 +8,9 @@ import test from "node:test";
 process.env.DATABASE_PATH = join(mkdtempSync(join(tmpdir(), "tomato-api-")), "test.sqlite");
 
 const { app } = await import("../server/index.js");
-const { db } = await import("../server/db.js");
+const { db, petFromRow } = await import("../server/db.js");
+const { config } = await import("../server/config.js");
+const { createAiSummaryService } = await import("../server/aiService.js");
 
 function listen() {
   return new Promise((resolve, reject) => {
@@ -53,7 +56,12 @@ test("core study management API supports auth, sync, stats, and idempotent offli
 
   assert.equal(health.ok, true);
   assert.equal(health.service, "kaoyan-pomodoro-api");
+  assert.equal(health.storage.status, "self-managed");
+  assert.equal(typeof health.ai.configured, "boolean");
+  assert.ok(["ready", "not-configured"].includes(health.ai.status));
+  assert.equal(typeof health.ai.model, "string");
   assert.equal(readiness.ok, true);
+  assert.deepEqual(readiness.ai, health.ai);
 
   for (const stylesheet of ["/css/theme.css", "/css/base.css", "/css/layout.css"]) {
     const response = await fetch(`${baseUrl}${stylesheet}`);
@@ -81,6 +89,27 @@ test("core study management API supports auth, sync, stats, and idempotent offli
 
   assert.equal(registered.user.email, email);
 
+  const malformedLogin = await request(baseUrl, "/api/auth/login", {
+    method: "POST",
+    expectedStatus: 401,
+    body: {
+      email,
+      password: { unexpected: true },
+    },
+  });
+  assert.equal(malformedLogin.error, "邮箱或密码不正确。");
+
+  const invalidPassword = await request(baseUrl, "/api/auth/register", {
+    method: "POST",
+    expectedStatus: 400,
+    body: {
+      email: `invalid-${stamp}@example.com`,
+      password: "a".repeat(129),
+      displayName: "异常密码",
+    },
+  });
+  assert.match(invalidPassword.error, /128/);
+
   const taskClientId = `task-${stamp}`;
   const firstTask = await request(baseUrl, "/api/tasks", {
     method: "POST",
@@ -94,7 +123,8 @@ test("core study management API supports auth, sync, stats, and idempotent offli
       sourceLabel: "AI suggestion",
       sourceDateKey: "2026-06-26",
       suggestedForDate: "2026-06-27",
-      aiGeneratedAt: "2026-06-26T12:00:00.000Z"
+      aiGeneratedAt: "2026-06-26T12:00:00.000Z",
+      xpEarned: 10
     }
   });
   const duplicateTask = await request(baseUrl, "/api/tasks", {
@@ -116,6 +146,7 @@ test("core study management API supports auth, sync, stats, and idempotent offli
   assert.equal(firstTask.task.sourceDateKey, "2026-06-26");
   assert.equal(firstTask.task.suggestedForDate, "2026-06-27");
   assert.equal(firstTask.task.aiGeneratedAt, "2026-06-26T12:00:00.000Z");
+  assert.equal(firstTask.task.xpEarned, 10);
 
   const syncedTasks = await request(baseUrl, "/api/tasks?date=2026-06-27", { token });
   const syncedTask = syncedTasks.tasks.find((task) => task.clientId === taskClientId);
@@ -217,6 +248,34 @@ test("core study management API supports auth, sync, stats, and idempotent offli
   });
 
   assert.equal(firstFocus.focusSession.id, duplicateFocus.focusSession.id);
+
+  const invalidFocusTime = await request(baseUrl, "/api/focus-sessions", {
+    method: "POST",
+    token,
+    expectedStatus: 400,
+    body: {
+      taskTitle: "非法时间测试",
+      minutes: 25,
+      startedAt: "not-a-date",
+      endedAt: "2026-06-27T08:25:00.000Z",
+    },
+  });
+  assert.match(invalidFocusTime.error, /时间格式/);
+
+  const focusWithUnknownTask = await request(baseUrl, "/api/focus-sessions", {
+    method: "POST",
+    token,
+    body: {
+      clientId: `focus-unknown-task-${stamp}`,
+      taskId: "offline-local-task-id",
+      taskTitle: "离线任务专注",
+      minutes: 25,
+      dateKey: "2026-06-27",
+      startedAt: "2026-06-27T12:00:00.000Z",
+      endedAt: "2026-06-27T12:25:00.000Z",
+    },
+  });
+  assert.equal(focusWithUnknownTask.focusSession.taskId, null);
   assert.equal(firstFocus.focusSession.clientId, focusClientId);
   assert.equal(firstFocus.focusSession.dateKey, todayDateKey);
 
@@ -249,16 +308,47 @@ test("core study management API supports auth, sync, stats, and idempotent offli
       currentStudyGoalId: firstGoal.studyGoal.id
     }
   });
-  await request(baseUrl, "/api/pet", {
+  const initialPet = await request(baseUrl, "/api/pet", { token });
+  const updatedPet = await request(baseUrl, "/api/pet", {
     method: "PUT",
     token,
     body: {
       petId: "greenDino",
       level: 3,
       currentXP: 40,
-      totalXP: 240
+      totalXP: 240,
+      updatedAt: initialPet.pet.updatedAt
     }
   });
+  const petConflict = await request(baseUrl, "/api/pet", {
+    method: "PUT",
+    token,
+    expectedStatus: 409,
+    body: {
+      petId: "penguin",
+      level: 1,
+      currentXP: 0,
+      totalXP: 0,
+      updatedAt: initialPet.pet.updatedAt
+    }
+  });
+  assert.equal(updatedPet.pet.totalXP, 290);
+  assert.equal(petConflict.code, "PET_VERSION_CONFLICT");
+
+  const repairedPet = await request(baseUrl, "/api/pet", {
+    method: "PUT",
+    token,
+    body: {
+      petId: "greenDino",
+      level: 3,
+      currentXP: 25,
+      totalXP: "not-a-number",
+      updatedAt: updatedPet.pet.updatedAt,
+    },
+  });
+  assert.equal(repairedPet.pet.level, 3);
+  assert.equal(repairedPet.pet.currentXP, 40);
+  assert.equal(repairedPet.pet.totalXP, 290);
 
   const stats = await request(baseUrl, "/api/stats?range=week", { token });
   assert.equal(stats.days.length, 7);
@@ -272,8 +362,8 @@ test("core study management API supports auth, sync, stats, and idempotent offli
 
   const monthStats = await request(baseUrl, "/api/stats?range=month", { token });
   assert.equal(monthStats.days.length, 30);
-  assert.equal(monthStats.summary.activeDays, 2);
-  assert.equal(monthStats.totals.focusMinutes, 80);
+  assert.equal(monthStats.summary.activeDays, 3);
+  assert.equal(monthStats.totals.focusMinutes, 105);
 
   const missingAiConfig = await request(baseUrl, "/api/ai/daily-summary", {
     method: "POST",
@@ -298,14 +388,25 @@ test("core study management API supports auth, sync, stats, and idempotent offli
     encouragement: "继续保持稳定节奏。"
   };
   const generatedAt = new Date().toISOString();
+  const aiService = createAiSummaryService({ db, config, petFromRow });
+  const summaryContext = aiService.buildDailySummaryContext(registered.user.id, todayDateKey);
+  const summaryFingerprint = createHash("sha256").update(JSON.stringify(summaryContext)).digest("hex");
   db.prepare(`
     INSERT INTO ai_daily_summaries (
       user_id, date_key, provider, model, summary_json, source_fingerprint, generated_at, updated_at
-    ) VALUES (?, ?, 'deepseek', 'test-model', ?, 'test-fingerprint', ?, ?)
-  `).run(registered.user.id, todayDateKey, JSON.stringify(storedSummary), generatedAt, generatedAt);
+    ) VALUES (?, ?, 'deepseek', 'test-model', ?, ?, ?, ?)
+  `).run(
+    registered.user.id,
+    todayDateKey,
+    JSON.stringify(storedSummary),
+    summaryFingerprint,
+    generatedAt,
+    generatedAt,
+  );
 
   const restoredSummary = await request(baseUrl, `/api/ai/daily-summary?dateKey=${todayDateKey}`, { token });
   assert.equal(restoredSummary.summary.tomorrowPlan[0], "优先整理数学错题");
+  assert.equal(restoredSummary.summary.diagnosis.nextAction, "优先整理数学错题");
 
   const cachedSummary = await request(baseUrl, "/api/ai/daily-summary", {
     method: "POST",
@@ -314,6 +415,16 @@ test("core study management API supports auth, sync, stats, and idempotent offli
   });
   assert.equal(cachedSummary.cached, true);
   assert.equal(cachedSummary.summary.title, "今日复盘");
+
+  db.prepare("UPDATE focus_sessions SET task_title = ? WHERE id = ?")
+    .run("数学：新增执行变化", firstFocus.focusSession.id);
+  const changedSummary = await request(baseUrl, "/api/ai/daily-summary", {
+    method: "POST",
+    token,
+    expectedStatus: 503,
+    body: { dateKey: todayDateKey }
+  });
+  assert.equal(changedSummary.code, "AI_NOT_CONFIGURED");
 
   const sync = await request(baseUrl, "/api/sync", { token });
   assert.equal(sync.settings.focusDuration, 45);

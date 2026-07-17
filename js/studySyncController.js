@@ -36,10 +36,10 @@ export function createStudySyncController({
     if (!isEnabled()) return;
     await flushDeletedTasks();
     await uploadStudyGoals();
+    await uploadTasks();
     await syncSettings();
     await syncPet();
     await uploadFocusRecords();
-    await uploadTasks();
   }
 
   async function uploadFocusRecords() {
@@ -67,8 +67,11 @@ export function createStudySyncController({
   async function uploadStudyGoals() {
     for (const goal of getStudyGoals()) {
       if (goal.syncedGoalId) continue;
+      const previousId = goal.id;
       const created = await createStudyGoal(goal);
-      replaceStudyGoal(goal.id, normalizeStudyGoal(created.studyGoal));
+      const normalized = normalizeStudyGoal(created.studyGoal);
+      replaceStudyGoal(previousId, normalized);
+      remapFocusRecordReference("studyGoalId", previousId, normalized?.id);
     }
   }
 
@@ -100,12 +103,29 @@ export function createStudySyncController({
   async function syncPet() {
     if (!isEnabled()) return;
     const data = getTodayData();
-    await repository.updatePet({
+    const localPet = {
       petId: data.petProgress.petId || data.selectedPet,
       level: data.petProgress.level,
       currentXP: data.petProgress.currentXP,
       totalXP: data.petProgress.totalXP,
-    });
+      updatedAt: data.petProgress.lastUpdated,
+    };
+
+    try {
+      const result = await repository.updatePet(localPet);
+      applyPet(result.pet);
+      return result.pet;
+    } catch (error) {
+      if (error.code !== "PET_VERSION_CONFLICT") throw error;
+      const { pet: cloudPet } = await repository.getPet();
+      if ((Number(cloudPet.totalXP) || 0) >= localPet.totalXP) {
+        applyPet(cloudPet);
+        return cloudPet;
+      }
+      const result = await repository.updatePet({ ...localPet, updatedAt: cloudPet.updatedAt });
+      applyPet(result.pet);
+      return result.pet;
+    }
   }
 
   async function uploadTasks() {
@@ -138,8 +158,30 @@ export function createStudySyncController({
     });
     if (!normalized) return null;
     Object.assign(localTask, normalized);
+    remapFocusRecordReference("taskId", previousId, normalized.id);
     onTaskIdentityChanged(previousId, normalized);
     return normalized;
+  }
+
+  function remapFocusRecordReference(field, previousId, nextId) {
+    if (!previousId || !nextId || previousId === nextId) return;
+    const data = getTodayData();
+
+    for (const record of data.records || []) {
+      if (record[field] === previousId) {
+        record[field] = nextId;
+      }
+    }
+
+    if (field === "taskId" && data.currentTaskId === previousId) {
+      data.currentTaskId = nextId;
+    }
+
+    if (field === "studyGoalId" && data.currentStudyGoalId === previousId) {
+      data.currentStudyGoalId = nextId;
+    }
+
+    saveToday(false);
   }
 
   async function patchTask(task, patch, dateKey = getTodayKey()) {

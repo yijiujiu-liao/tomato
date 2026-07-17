@@ -35,12 +35,17 @@ test("focus flow delegates the completion transaction and opens rest feedback", 
     openCompletion: () => calls.push(["open"]),
     closeCompletion: () => calls.push(["close"]),
     buildCompletionMessage: () => "完成",
+    scheduleCompletion: (open) => {
+      calls.push(["schedule"]);
+      open();
+    },
   });
 
   const result = controller.finish();
   assert.equal(result.mode, "focus");
   assert.ok(calls.some(([name]) => name === "sync"));
   assert.ok(calls.some(([name]) => name === "open"));
+  assert.ok(calls.findIndex(([name]) => name === "schedule") < calls.findIndex(([name]) => name === "open"));
   assert.ok(calls.some(([name, value]) => name === "status" && value === "完成"));
   assert.equal(controller.startRest(), "short");
   assert.ok(calls.some(([name, mode, seconds]) => name === "mode" && mode === "rest" && seconds === 300));

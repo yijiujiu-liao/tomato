@@ -1,0 +1,9 @@
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	reverse_proxy app:3000 {
+		health_uri /api/ready
+		health_interval 30s
+		lb_try_duration 5s
+	}
+}
