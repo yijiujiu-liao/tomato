@@ -58,6 +58,8 @@ services:
     image: tomato-app:local
     container_name: tomato-backup
     restart: unless-stopped
+    healthcheck:
+      disable: true
     depends_on:
       app:
         condition: service_healthy
