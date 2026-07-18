@@ -3,10 +3,10 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const ASSETS = [
-  "assets/pets/penguin-walk-v2.png",
-  "assets/pets/purple-dragon-walk-v2.png",
-  "assets/pets/green-dino-walk-v2.png",
-  "assets/pets/chick-walk-v2.png",
+  "assets/pets/penguin-walk-v3.png",
+  "assets/pets/purple-dragon-walk-v3.png",
+  "assets/pets/green-dino-walk-v3.png",
+  "assets/pets/chick-walk-v3.png",
 ];
 
 function readPngDimensions(buffer) {
@@ -17,11 +17,11 @@ function readPngDimensions(buffer) {
   };
 }
 
-test("pet walk atlases contain four stages and eight animation frames", async () => {
+test("pet walk atlases contain four stages and sixteen animation frames", async () => {
   for (const asset of ASSETS) {
     const buffer = await readFile(asset);
     assert.deepEqual(readPngDimensions(buffer), {
-      width: 2048,
+      width: 4096,
       height: 1024,
     });
   }

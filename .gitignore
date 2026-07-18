@@ -6,3 +6,4 @@ promo-video/
 promo-video/renders/work-*/
 *.log
 tmp/
+.tmp/

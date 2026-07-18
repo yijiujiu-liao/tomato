@@ -802,7 +802,7 @@ body.dark .timer-pet-speech {
   background-repeat: no-repeat;
   background-position-x: 0%;
   background-position-y: var(--pet-stage-position);
-  background-size: 800% 400%;
+  background-size: 1600% 400%;
   filter: drop-shadow(0 8px 9px rgba(33, 57, 50, 0.11));
   transform: scale(var(--pet-activity-scale, 1));
   transform-origin: 50% 100%;
@@ -810,11 +810,11 @@ body.dark .timer-pet-speech {
 }
 
 .timer-pet-companion[data-action="walk"] .pet-activity-sprite {
-  animation: petFramesWalk 0.88s steps(1, end) infinite;
+  animation: petFramesWalk 1.76s steps(1, end) infinite;
 }
 
 .timer-pet-companion[data-action="walk"] .pet-ground-track {
-  animation: petGroundMoveLeft 0.88s linear infinite;
+  animation: petGroundMoveLeft 1.76s linear infinite;
 }
 
 .timer-pet-companion[data-action="walk"] .pet-playground-leaf,
@@ -832,31 +832,63 @@ body.dark .timer-pet-speech {
     background-position-x: 0%;
   }
 
+  6.25% {
+    background-position-x: 6.6667%;
+  }
+
   12.5% {
-    background-position-x: 14.2857%;
+    background-position-x: 13.3333%;
+  }
+
+  18.75% {
+    background-position-x: 20%;
   }
 
   25% {
-    background-position-x: 28.5714%;
+    background-position-x: 26.6667%;
+  }
+
+  31.25% {
+    background-position-x: 33.3333%;
   }
 
   37.5% {
-    background-position-x: 42.8571%;
+    background-position-x: 40%;
+  }
+
+  43.75% {
+    background-position-x: 46.6667%;
   }
 
   50% {
-    background-position-x: 57.1429%;
+    background-position-x: 53.3333%;
+  }
+
+  56.25% {
+    background-position-x: 60%;
   }
 
   62.5% {
-    background-position-x: 71.4286%;
+    background-position-x: 66.6667%;
+  }
+
+  68.75% {
+    background-position-x: 73.3333%;
   }
 
   75% {
-    background-position-x: 85.7143%;
+    background-position-x: 80%;
+  }
+
+  81.25% {
+    background-position-x: 86.6667%;
   }
 
   87.5% {
+    background-position-x: 93.3333%;
+  }
+
+  93.75% {
     background-position-x: 100%;
   }
 }
@@ -867,7 +899,7 @@ body.dark .timer-pet-speech {
   }
 
   to {
-    transform: translateX(-72px);
+    transform: translateX(-60px);
   }
 }
 

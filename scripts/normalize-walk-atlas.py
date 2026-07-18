@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Normalize generated walk-cycle cells to a stable body center and baseline."""
+"""Normalize generated walk cycles and add motion-aware in-between frames."""
 
 import argparse
 import json
@@ -7,9 +7,22 @@ from pathlib import Path
 
 from PIL import Image, ImageChops, ImageStat
 
+try:
+    import numpy as np
+except ImportError:
+    np = None
+
+try:
+    if np is None:
+        raise ImportError
+    import cv2
+except ImportError:
+    cv2 = None
+
 
 ROWS = 4
-COLS = 8
+SOURCE_COLUMNS = 8
+OUTPUT_COLUMNS = 16
 CELL_SIZE = 256
 BASELINE = 244
 ALPHA_THRESHOLD = 24
@@ -56,9 +69,9 @@ def split_cells(atlas):
         row_cells = []
         top = round(row * atlas.height / ROWS)
         bottom = round((row + 1) * atlas.height / ROWS)
-        for column in range(COLS):
-            left = round(column * atlas.width / COLS)
-            right = round((column + 1) * atlas.width / COLS)
+        for column in range(SOURCE_COLUMNS):
+            left = round(column * atlas.width / SOURCE_COLUMNS)
+            right = round((column + 1) * atlas.width / SOURCE_COLUMNS)
             cell = atlas.crop((left, top, right, bottom))
             bbox = alpha_bbox(cell)
             if bbox is None:
@@ -128,6 +141,162 @@ def repair_loop_outlier(frames):
     return repaired, True
 
 
+def alpha_aware_blend(first, second, progress):
+    if np is None:
+        transition = Image.blend(first, second, progress)
+        transition.putalpha(
+            ImageChops.lighter(
+                first.getchannel("A"),
+                second.getchannel("A"),
+            )
+        )
+        return transition
+
+    first_array = np.asarray(first, dtype=np.float32) / 255
+    second_array = np.asarray(second, dtype=np.float32) / 255
+    first_alpha = first_array[..., 3:4]
+    second_alpha = second_array[..., 3:4]
+    alpha_weight = first_alpha * (1 - progress) + second_alpha * progress
+    color_weight = np.maximum(
+        first_alpha * (1 - progress) + second_alpha * progress,
+        1e-6,
+    )
+    color = (
+        first_array[..., :3] * first_alpha * (1 - progress)
+        + second_array[..., :3] * second_alpha * progress
+    ) / color_weight
+    output = np.concatenate((color, alpha_weight), axis=2)
+    return Image.fromarray(
+        np.clip(output * 255, 0, 255).astype(np.uint8),
+        "RGBA",
+    )
+
+
+def flow_reference(image):
+    pixels = np.asarray(image, dtype=np.float32)
+    alpha = pixels[..., 3:4] / 255
+    background = np.full_like(pixels[..., :3], 242)
+    composite = pixels[..., :3] * alpha + background * (1 - alpha)
+    return cv2.cvtColor(composite.astype(np.uint8), cv2.COLOR_RGB2GRAY)
+
+
+def remap_channel(channel, flow, progress):
+    height, width = channel.shape[:2]
+    grid_x, grid_y = np.meshgrid(
+        np.arange(width, dtype=np.float32),
+        np.arange(height, dtype=np.float32),
+    )
+    return cv2.remap(
+        channel,
+        grid_x - flow[..., 0] * progress,
+        grid_y - flow[..., 1] * progress,
+        interpolation=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_CONSTANT,
+        borderValue=0,
+    )
+
+
+def motion_intermediate(first, second, progress=0.5):
+    if cv2 is None:
+        return alpha_aware_blend(first, second, progress)
+
+    first_reference = flow_reference(first)
+    second_reference = flow_reference(second)
+    flow_forward = cv2.calcOpticalFlowFarneback(
+        first_reference,
+        second_reference,
+        None,
+        0.5,
+        4,
+        25,
+        4,
+        7,
+        1.5,
+        0,
+    )
+    flow_backward = cv2.calcOpticalFlowFarneback(
+        second_reference,
+        first_reference,
+        None,
+        0.5,
+        4,
+        25,
+        4,
+        7,
+        1.5,
+        0,
+    )
+
+    first_array = np.asarray(first, dtype=np.float32) / 255
+    second_array = np.asarray(second, dtype=np.float32) / 255
+    first_alpha = first_array[..., 3]
+    second_alpha = second_array[..., 3]
+    first_premultiplied = first_array[..., :3] * first_alpha[..., None]
+    second_premultiplied = second_array[..., :3] * second_alpha[..., None]
+
+    warped_first_alpha = remap_channel(first_alpha, flow_forward, progress)
+    warped_second_alpha = remap_channel(
+        second_alpha,
+        flow_backward,
+        1 - progress,
+    )
+    warped_first_color = remap_channel(
+        first_premultiplied,
+        flow_forward,
+        progress,
+    )
+    warped_second_color = remap_channel(
+        second_premultiplied,
+        flow_backward,
+        1 - progress,
+    )
+
+    output_alpha = (
+        warped_first_alpha * (1 - progress)
+        + warped_second_alpha * progress
+    )
+    output_premultiplied = (
+        warped_first_color * (1 - progress)
+        + warped_second_color * progress
+    )
+    output_color = output_premultiplied / np.maximum(
+        output_alpha[..., None],
+        1e-6,
+    )
+    output = np.dstack((output_color, output_alpha))
+    return Image.fromarray(
+        np.clip(output * 255, 0, 255).astype(np.uint8),
+        "RGBA",
+    )
+
+
+def stabilize_frame(frame):
+    bbox = alpha_bbox(frame)
+    if bbox is None:
+        raise ValueError("Generated in-between frame is blank")
+    subject = frame.crop(bbox)
+    paste_x = round(CELL_SIZE / 2 - alpha_centroid_x(subject))
+    paste_y = BASELINE - subject.height
+    stabilized = Image.new(
+        "RGBA",
+        (CELL_SIZE, CELL_SIZE),
+        (0, 0, 0, 0),
+    )
+    stabilized.alpha_composite(subject, (paste_x, paste_y))
+    return stabilized
+
+
+def add_in_between_frames(frames):
+    expanded = []
+    for index, frame in enumerate(frames):
+        next_frame = frames[(index + 1) % len(frames)]
+        expanded.append(frame)
+        expanded.append(
+            stabilize_frame(motion_intermediate(frame, next_frame))
+        )
+    return expanded
+
+
 def frame_metrics(frame, row, column):
     bbox = alpha_bbox(frame)
     if bbox is None:
@@ -157,7 +326,7 @@ def normalize_atlas(input_path, output_path):
     rows = split_cells(source)
     output = Image.new(
         "RGBA",
-        (COLS * CELL_SIZE, ROWS * CELL_SIZE),
+        (OUTPUT_COLUMNS * CELL_SIZE, ROWS * CELL_SIZE),
         (0, 0, 0, 0),
     )
     report = []
@@ -168,7 +337,8 @@ def normalize_atlas(input_path, output_path):
         normalized, repaired = repair_loop_outlier(normalized)
         if repaired:
             repaired_loops.append(row_index + 1)
-        for column_index, frame in enumerate(normalized):
+        expanded = add_in_between_frames(normalized)
+        for column_index, frame in enumerate(expanded):
             output.alpha_composite(
                 frame,
                 (column_index * CELL_SIZE, row_index * CELL_SIZE),
