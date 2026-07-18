@@ -179,7 +179,7 @@ export function renderPetActivity(typeKey, evolutionStageId) {
       class="pet-activity-sprite"
       role="img"
       aria-label="${pet.name}正在向右走"
-      style="--pet-activity-image: url('${pet.walkSrc}'); --pet-stage-position: ${stagePosition}%;"
+      style="--pet-activity-image: url('${pet.walkSrc}'); --pet-stage-position: ${stagePosition}%; --pet-activity-scale: ${pet.walkScale || 1};"
     ></span>
   `;
 }
