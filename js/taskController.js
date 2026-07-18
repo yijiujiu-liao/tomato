@@ -42,13 +42,14 @@ export function createTaskController({
     if (pet) renderPet();
   }
 
-  function add(title) {
-    const task = createLocalTask({ title, id: createTaskId() });
+  function add(title, studyGoalId = "") {
+    const task = createLocalTask({ title, studyGoalId, id: createTaskId() });
     if (!task) return false;
     taskStore.addTask(getTodayKey(), task);
     const data = getData();
     data.currentTaskId = task.id;
     data.currentTask = task.title;
+    data.currentStudyGoalId = task.studyGoalId;
     savePlans();
     saveData();
     refresh();
@@ -84,6 +85,7 @@ export function createTaskController({
     if (data.currentTaskId === taskId) {
       data.currentTaskId = "";
       data.currentTask = "";
+      data.currentStudyGoalId = "";
       saveData();
     }
     savePlans();
@@ -131,6 +133,7 @@ export function createTaskController({
     if (data.currentTaskId === task.id) {
       data.currentTaskId = "";
       data.currentTask = "";
+      data.currentStudyGoalId = "";
       saveData();
     }
     savePlans();
@@ -165,6 +168,7 @@ export function createTaskController({
     if (data.currentTaskId === result.task.id) {
       data.currentTaskId = "";
       data.currentTask = "";
+      data.currentStudyGoalId = "";
       saveData();
     }
     savePlans();
@@ -191,6 +195,7 @@ export function createTaskController({
     if (!data.currentTaskId) {
       data.currentTaskId = task.id;
       data.currentTask = task.title;
+      data.currentStudyGoalId = task.studyGoalId || "";
       saveData();
     }
     savePlans();
@@ -208,6 +213,7 @@ export function createTaskController({
     const data = getData();
     data.currentTaskId = task?.id || "";
     data.currentTask = task?.title || "";
+    data.currentStudyGoalId = task?.studyGoalId || "";
     saveData();
     renderCurrentOptions();
     renderTasks();
@@ -219,5 +225,18 @@ export function createTaskController({
     return task;
   }
 
-  return { add, edit, remove, carryOver, complete, delay, restore, select };
+  function assignGoal(taskId, studyGoalId) {
+    const task = getTodayTasks().find((item) => item.id === taskId && !item.completed);
+    if (!task || !studyGoalId) return false;
+    task.studyGoalId = studyGoalId;
+    const data = getData();
+    if (data.currentTaskId === task.id) data.currentStudyGoalId = studyGoalId;
+    savePlans();
+    saveData();
+    refresh();
+    runCloudSync(() => syncController.patchTask(task, { studyGoalId }));
+    return true;
+  }
+
+  return { add, edit, remove, carryOver, complete, delay, restore, select, assignGoal };
 }

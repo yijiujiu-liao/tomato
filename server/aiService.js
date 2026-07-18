@@ -36,7 +36,7 @@ export function createAiSummaryService({ db, config, petFromRow, fetchImpl = fet
       SELECT
         id, title, completed, completed_at AS completedAt, created_at AS createdAt,
         source, source_label AS sourceLabel, source_date_key AS sourceDateKey,
-        suggested_for_date AS suggestedForDate
+        suggested_for_date AS suggestedForDate, study_goal_id AS studyGoalId
       FROM tasks
       WHERE user_id = ? AND date_key = ?
       ORDER BY created_at ASC
@@ -80,9 +80,16 @@ export function createAiSummaryService({ db, config, petFromRow, fetchImpl = fet
     `).all(userId, dateKey, dateKey);
     const studyGoals = db.prepare(`
       SELECT study_goals.id, study_goals.title,
+        study_goals.description,
         study_goals.target_minutes AS targetMinutes,
-        study_goals.target_date AS targetDate, study_goals.completed,
-        COALESCE(SUM(CASE WHEN focus_sessions.mode = 'focus' THEN focus_sessions.minutes ELSE 0 END), 0) AS focusMinutes
+        study_goals.weekly_target_minutes AS weeklyTargetMinutes,
+        study_goals.target_date AS targetDate, study_goals.is_primary AS isPrimary,
+        study_goals.completed,
+        COALESCE(SUM(CASE WHEN focus_sessions.mode = 'focus' THEN focus_sessions.minutes ELSE 0 END), 0) AS focusMinutes,
+        COALESCE(SUM(CASE
+          WHEN focus_sessions.mode = 'focus'
+            AND focus_sessions.date_key BETWEEN date(?, '-6 days') AND ?
+          THEN focus_sessions.minutes ELSE 0 END), 0) AS recentFocusMinutes
       FROM study_goals
       LEFT JOIN focus_sessions
         ON focus_sessions.study_goal_id = study_goals.id
@@ -91,14 +98,17 @@ export function createAiSummaryService({ db, config, petFromRow, fetchImpl = fet
       GROUP BY study_goals.id
       ORDER BY study_goals.completed ASC, study_goals.updated_at DESC
       LIMIT 8
-    `).all(userId).map((goal) => {
+    `).all(dateKey, dateKey, userId).map((goal) => {
       const targetMinutes = Number(goal.targetMinutes) || 0;
       const focusMinutes = Number(goal.focusMinutes) || 0;
       return {
         ...goal,
         targetMinutes,
+        weeklyTargetMinutes: Number(goal.weeklyTargetMinutes) || 0,
         completed: Boolean(goal.completed),
+        isPrimary: Boolean(goal.isPrimary),
         focusMinutes,
+        recentFocusMinutes: Number(goal.recentFocusMinutes) || 0,
         progressPercent: targetMinutes > 0 ? Math.min(100, Math.round((focusMinutes / targetMinutes) * 100)) : 0,
       };
     });

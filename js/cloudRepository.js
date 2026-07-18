@@ -37,8 +37,11 @@ export function createCloudRepository(request) {
         body: {
           clientId: goal.clientId || goal.id,
           title: goal.title,
+          description: goal.description,
           targetMinutes: goal.targetMinutes,
+          weeklyTargetMinutes: goal.weeklyTargetMinutes,
           targetDate: goal.targetDate,
+          isPrimary: goal.isPrimary,
           completed: goal.completed,
         },
       });
@@ -64,6 +67,7 @@ export function createCloudRepository(request) {
         body: {
           clientId: task.clientId || task.id,
           title: task.title,
+          studyGoalId: task.studyGoalId || null,
           dateKey,
           completed: task.completed,
           carriedFromId: task.carriedFromId || null,

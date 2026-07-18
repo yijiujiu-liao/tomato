@@ -1,6 +1,6 @@
 import { escapeHtml, formatPlanDate, normalizeNonNegativeInteger } from "../utils.js";
 
-export function renderRecordsView(list, records) {
+export function renderRecordsView(list, records, getGoalLabel = () => "") {
   list.innerHTML = "";
   if (records.length === 0) {
     const empty = document.createElement("li");
@@ -10,12 +10,14 @@ export function renderRecordsView(list, records) {
     return;
   }
   records.forEach((record) => {
+    const goalLabel = getGoalLabel(record.studyGoalId);
     const item = document.createElement("li");
     item.className = "record-item";
     item.innerHTML = `
       <span class="record-time">${record.time}</span>
       <span class="record-task">${escapeHtml(record.task)}</span>
       <span> · ${record.minutes} 分钟专注</span>
+      ${goalLabel ? `<small class="record-goal">目标 · ${escapeHtml(goalLabel)}</small>` : ""}
     `;
     list.appendChild(item);
   });

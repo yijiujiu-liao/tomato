@@ -17,10 +17,14 @@ export function normalizeStudyGoal(goal) {
     clientId,
     syncedGoalId,
     title: goal.title.trim().slice(0, 80),
+    description: typeof goal.description === "string" ? goal.description.trim().slice(0, 240) : "",
     targetMinutes: normalizeNonNegativeInteger(goal.targetMinutes),
+    weeklyTargetMinutes: normalizeNonNegativeInteger(goal.weeklyTargetMinutes),
     focusMinutes: normalizeNonNegativeInteger(goal.focusMinutes),
+    recentFocusMinutes: normalizeNonNegativeInteger(goal.recentFocusMinutes),
     progressPercent: normalizeNonNegativeInteger(goal.progressPercent),
     targetDate: /^\d{4}-\d{2}-\d{2}$/.test(goal.targetDate || "") ? goal.targetDate : null,
+    isPrimary: Boolean(goal.isPrimary),
     completed: Boolean(goal.completed),
     createdAt: typeof goal.createdAt === "string" ? goal.createdAt : new Date().toISOString(),
     completedAt: goal.completed && typeof goal.completedAt === "string" ? goal.completedAt : null,
@@ -33,5 +37,14 @@ export function sortStudyGoals(first, second) {
     return Number(first.completed) - Number(second.completed);
   }
 
+  if (first.isPrimary !== second.isPrimary) {
+    return Number(second.isPrimary) - Number(first.isPrimary);
+  }
+
   return new Date(second.updatedAt) - new Date(first.updatedAt);
+}
+
+export function getPrimaryStudyGoal(goals = []) {
+  const active = goals.filter((goal) => goal && !goal.completed);
+  return active.find((goal) => goal.isPrimary) || active[0] || null;
 }

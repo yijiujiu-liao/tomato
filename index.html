@@ -91,6 +91,7 @@
             <p id="homeNextTaskHint">选择任务后才能开始番茄钟。</p>
             <div class="home-quick-task" id="homeQuickTask" hidden>
               <input id="homeQuickTaskInput" type="text" maxlength="60" placeholder="写下今天最重要的一件事" aria-label="快速添加今日任务">
+              <select id="homeQuickTaskGoalSelect" aria-label="选择任务所属长期目标"></select>
               <button class="primary-btn" id="homeQuickTaskBtn" type="button">添加</button>
             </div>
             <button class="secondary-btn home-review-cta" id="homeReviewBtn" type="button" hidden>收束今天，生成明日计划</button>
@@ -130,6 +131,7 @@
 
           <div class="task-add-row">
             <input id="newTaskInput" type="text" placeholder="例如：数学强化第 3 讲" maxlength="60">
+            <select id="newTaskGoalSelect" aria-label="选择任务所属长期目标"></select>
             <button class="primary-btn add-task-btn" id="addTaskBtn" type="button">添加</button>
           </div>
 
@@ -465,6 +467,47 @@
       </button>
     </nav>
   </main>
+
+  <div class="long-goal-onboarding" id="longGoalOnboarding" aria-hidden="true" inert hidden>
+    <section class="long-goal-onboarding-card" role="dialog" aria-modal="true" aria-labelledby="longGoalOnboardingTitle">
+      <div class="long-goal-onboarding-progress" aria-label="首次设置，第 1 步，共 1 步">
+        <span></span>
+        <small>首次设置 · 约 1 分钟</small>
+      </div>
+      <p class="page-kicker">Your Direction</p>
+      <h2 id="longGoalOnboardingTitle">先确定你为什么而学</h2>
+      <p class="long-goal-onboarding-lead">以后每个任务、每轮番茄和 AI 明日计划，都会沿着这个目标推进。</p>
+      <form id="longGoalOnboardingForm">
+        <label>
+          <span>你的长期目标</span>
+          <input id="onboardingGoalTitle" type="text" maxlength="80" placeholder="例如：2027 年考取复旦大学金融专硕" required>
+        </label>
+        <div class="long-goal-onboarding-grid">
+          <label>
+            <span>计划达成日期</span>
+            <input id="onboardingGoalDate" type="date" required>
+          </label>
+          <label>
+            <span>每周可投入</span>
+            <span class="onboarding-number-field">
+              <input id="onboardingWeeklyHours" type="number" min="1" max="80" value="20" inputmode="numeric" required>
+              <em>小时</em>
+            </span>
+          </label>
+        </div>
+        <label>
+          <span>达成标准或原因 <small>选填</small></span>
+          <textarea id="onboardingGoalDescription" maxlength="240" rows="3" placeholder="例如：初试目标 390 分，数学至少 125 分；这是我换方向的关键一年。"></textarea>
+        </label>
+        <div class="long-goal-onboarding-preview">
+          <strong>之后你会得到</strong>
+          <span>目标归属清晰的任务 · 可追踪的专注投入 · AI 目标偏差诊断</span>
+        </div>
+        <button class="primary-btn" type="submit">建立目标，开始今天</button>
+        <p id="onboardingGoalStatus" role="status"></p>
+      </form>
+    </section>
+  </div>
 
   <div class="settings-drawer" id="settingsDrawer" aria-hidden="true" inert hidden>
     <section class="settings-drawer-card" role="dialog" aria-modal="true" aria-labelledby="settingsDrawerTitle">

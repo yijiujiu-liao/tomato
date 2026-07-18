@@ -32,7 +32,7 @@ test("study diagnostics put the most actionable problem first", () => {
   }));
   const primary = getPrimaryStudyDiagnostic(items);
 
-  assert.equal(items.length, 4);
+  assert.equal(items.length, 5);
   assert.equal(primary.level, "bad");
   assert.match(primary.text, /先完成当前这一轮|建议砍到前三件/);
 });
@@ -44,7 +44,14 @@ test("study diagnostics recognize a completed daily rhythm", () => {
       dailyGoal: 8,
       records: [{ task: "数学：真题", minutes: 50 }],
     },
-    todayTasks: [{ title: "数学：真题", completed: true }],
+    todayTasks: [{ title: "数学：真题", completed: true, studyGoalId: "goal-math" }],
+    studyGoals: [{
+      id: "goal-math",
+      title: "数学强化",
+      completed: false,
+      isPrimary: true,
+      recentFocusMinutes: 300,
+    }],
     recentPlans: Array.from({ length: 6 }, () => ({
       focusMinutes: 50,
       completedTasks: 1,

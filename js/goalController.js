@@ -4,9 +4,11 @@ export function createGoalController({
   getGoals,
   setGoals,
   getData,
+  taskStore,
   createGoalId,
   saveGoals,
   saveData,
+  savePlans,
   renderGoals,
   updateOptions,
   syncController,
@@ -21,7 +23,13 @@ export function createGoalController({
     data.records.forEach((record) => {
       if (record.studyGoalId === currentId) record.studyGoalId = nextGoal.id;
     });
+    for (const tasks of Object.values(taskStore?.getPlans?.() || {})) {
+      tasks.forEach((task) => {
+        if (task.studyGoalId === currentId) task.studyGoalId = nextGoal.id;
+      });
+    }
     saveData(false);
+    savePlans?.();
     saveGoals();
     renderGoals();
     updateOptions();
@@ -34,15 +42,21 @@ export function createGoalController({
       id: createGoalId(),
       clientId: "",
       title: input.title,
+      description: input.description,
       targetMinutes: input.targetMinutes,
+      weeklyTargetMinutes: input.weeklyTargetMinutes,
       targetDate: input.targetDate,
+      isPrimary: Boolean(input.isPrimary || !getGoals().some((item) => !item.completed)),
       completed: false,
       createdAt: now,
       completedAt: null,
       updatedAt: now,
     });
     if (!goal) return null;
-    setGoals([goal, ...getGoals()]);
+    const nextGoals = goal.isPrimary
+      ? getGoals().map((item) => ({ ...item, isPrimary: false }))
+      : getGoals();
+    setGoals([goal, ...nextGoals].sort(sortStudyGoals));
     saveGoals();
     renderGoals();
     runCloudSync(async () => {
@@ -52,12 +66,59 @@ export function createGoalController({
     return goal;
   }
 
+  function update(goalId, patch) {
+    const goal = getGoals().find((item) => item.id === goalId);
+    if (!goal) return null;
+    const nextGoal = normalizeStudyGoal({
+      ...goal,
+      ...patch,
+      updatedAt: new Date().toISOString(),
+    });
+    if (!nextGoal) return null;
+    let nextGoals = getGoals().map((item) => item.id === goalId ? nextGoal : item);
+    if (nextGoal.isPrimary) {
+      nextGoals = nextGoals.map((item) => item.id === goalId ? item : { ...item, isPrimary: false });
+    }
+    setGoals(nextGoals.sort(sortStudyGoals));
+    saveGoals();
+    renderGoals();
+    updateOptions();
+    runCloudSync(async () => {
+      if (!goal.syncedGoalId) {
+        const created = await syncController.createStudyGoal(nextGoal);
+        replace(goal.id, normalizeStudyGoal(created.studyGoal));
+        return;
+      }
+      const updated = await syncController.updateStudyGoal(goal.syncedGoalId, {
+        title: nextGoal.title,
+        description: nextGoal.description,
+        targetMinutes: nextGoal.targetMinutes,
+        weeklyTargetMinutes: nextGoal.weeklyTargetMinutes,
+        targetDate: nextGoal.targetDate,
+        isPrimary: nextGoal.isPrimary,
+      });
+      replace(goal.id, normalizeStudyGoal(updated.studyGoal));
+    });
+    return nextGoal;
+  }
+
   function toggle(goalId) {
     const goal = getGoals().find((item) => item.id === goalId);
     if (!goal) return false;
     goal.completed = !goal.completed;
     goal.completedAt = goal.completed ? new Date().toISOString() : null;
     goal.updatedAt = new Date().toISOString();
+    const data = getData();
+    if (goal.completed && data.currentStudyGoalId === goal.id) {
+      data.currentStudyGoalId = "";
+      saveData();
+    }
+    let promotedGoal = null;
+    if (goal.completed && goal.isPrimary) {
+      goal.isPrimary = false;
+      promotedGoal = getGoals().find((item) => item.id !== goal.id && !item.completed) || null;
+      if (promotedGoal) promotedGoal.isPrimary = true;
+    }
     saveGoals();
     renderGoals();
     runCloudSync(async () => {
@@ -66,8 +127,15 @@ export function createGoalController({
         replace(goal.id, normalizeStudyGoal(created.studyGoal));
         return;
       }
-      const updated = await syncController.updateStudyGoal(goal.syncedGoalId, { completed: goal.completed });
+      const updated = await syncController.updateStudyGoal(goal.syncedGoalId, {
+        completed: goal.completed,
+        isPrimary: goal.isPrimary,
+      });
       replace(goal.id, normalizeStudyGoal(updated.studyGoal));
+      if (promotedGoal?.syncedGoalId) {
+        const promoted = await syncController.updateStudyGoal(promotedGoal.syncedGoalId, { isPrimary: true });
+        replace(promotedGoal.id, normalizeStudyGoal(promoted.studyGoal));
+      }
     });
     return true;
   }
@@ -81,6 +149,12 @@ export function createGoalController({
       data.currentStudyGoalId = "";
       saveData();
     }
+    for (const tasks of Object.values(taskStore?.getPlans?.() || {})) {
+      tasks.forEach((task) => {
+        if (task.studyGoalId === goalId) task.studyGoalId = "";
+      });
+    }
+    savePlans?.();
     saveGoals();
     renderGoals();
     updateOptions();
@@ -90,5 +164,5 @@ export function createGoalController({
     return true;
   }
 
-  return { add, toggle, remove, replace };
+  return { add, update, toggle, remove, replace };
 }

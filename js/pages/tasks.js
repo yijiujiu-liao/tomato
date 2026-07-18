@@ -12,6 +12,7 @@ export function createTasksPageController({
   onRestore,
   onComplete,
   onDelay,
+  getGoalLabel = () => "",
 }) {
   let expanded = false;
   let recentlyCompletedTaskId = "";
@@ -37,6 +38,7 @@ export function createTasksPageController({
       completedTime: task.completedAt ? formatTaskCompletedTime(task.completedAt) : "",
       escapeHtml,
       sourceLabel: getTaskSourceLabel(task),
+      goalLabel: getGoalLabel(task.studyGoalId),
     });
     if (!task.completed && task.id === currentTaskId) item.classList.add("is-current-task");
     if (task.id === recentlyCompletedTaskId) {

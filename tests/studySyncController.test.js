@@ -12,7 +12,7 @@ class MemoryStorage {
 test("study sync controller uploads local entities in dependency-safe order", async () => {
   const storage = new MemoryStorage();
   const taskStore = createTaskStore({ storage, plansKey: "plans", deletedKey: "deleted" });
-  const localTask = { id: "task-local", title: "数学", completed: false };
+  const localTask = { id: "task-local", title: "数学", completed: false, studyGoalId: "goal-local" };
   taskStore.addTask("2026-07-12", localTask);
   taskStore.rememberDeleted("task-deleted");
   const data = {
@@ -98,6 +98,7 @@ test("study sync controller uploads local entities in dependency-safe order", as
   assert.equal(data.records[0].taskId, "task-cloud");
   assert.equal(data.records[0].studyGoalId, "goal-cloud");
   assert.equal(localTask.syncedTaskId, "task-cloud");
+  assert.equal(localTask.studyGoalId, "goal-cloud");
   assert.equal(taskStore.getDeletedIds().size, 0);
 });
 

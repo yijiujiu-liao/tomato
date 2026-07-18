@@ -17,6 +17,7 @@ export function normalizeTask(task) {
     clientId,
     syncedTaskId,
     title: task.title.trim(),
+    studyGoalId: typeof task.studyGoalId === "string" ? task.studyGoalId : "",
     completed: Boolean(task.completed),
     createdAt: typeof task.createdAt === "string" ? task.createdAt : new Date().toISOString(),
     completedAt: task.completed && typeof task.completedAt === "string" ? task.completedAt : null,
@@ -140,6 +141,12 @@ export function carryOverUnfinishedTasks({ store, fromDateKey, toDateKey, create
     .map((task) => createLocalTask({
       id: createId(),
       title: task.title,
+      studyGoalId: task.studyGoalId,
+      source: task.source || "carry",
+      sourceLabel: task.sourceLabel,
+      sourceDateKey: task.sourceDateKey,
+      suggestedForDate: task.suggestedForDate,
+      aiGeneratedAt: task.aiGeneratedAt,
       carriedFromId: task.id,
       now,
     }))

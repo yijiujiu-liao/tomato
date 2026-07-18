@@ -30,6 +30,9 @@ export function createCloudStateApplier({
     data.nextRestType = normalizeRestType(settingsValue.nextRestType);
     data.currentTaskId = typeof settingsValue.currentTaskId === "string" ? settingsValue.currentTaskId : "";
     data.currentStudyGoalId = typeof settingsValue.currentStudyGoalId === "string" ? settingsValue.currentStudyGoalId : "";
+    data.longGoalOnboardingCompleted = Boolean(
+      settingsValue.longGoalOnboardingCompleted || data.longGoalOnboardingCompleted
+    );
     modes.focus.minutes = data.focusDuration;
     modes.rest.minutes = getRestMinutes();
     if (timerEngine.getState().mode === "focus" && !timerEngine.isRunning()) {

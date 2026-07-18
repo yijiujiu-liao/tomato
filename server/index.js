@@ -172,7 +172,10 @@ app.get("/api/sync", requireAuth, (req, res) => {
   const studyGoals = db.prepare(`
     SELECT
       study_goals.*,
-      COALESCE(SUM(CASE WHEN focus_sessions.mode = 'focus' THEN focus_sessions.minutes ELSE 0 END), 0) AS focus_minutes
+      COALESCE(SUM(CASE WHEN focus_sessions.mode = 'focus' THEN focus_sessions.minutes ELSE 0 END), 0) AS focus_minutes,
+      COALESCE(SUM(CASE
+        WHEN focus_sessions.mode = 'focus' AND focus_sessions.date_key >= date('now', '-6 days')
+        THEN focus_sessions.minutes ELSE 0 END), 0) AS recent_focus_minutes
     FROM study_goals
     LEFT JOIN focus_sessions
       ON focus_sessions.study_goal_id = study_goals.id
@@ -227,6 +230,9 @@ app.put("/api/settings", requireAuth, (req, res) => {
     nextRestType: req.body?.nextRestType === "long" ? "long" : "short",
     currentTaskId: normalizeOwnedTaskId(userId, req.body?.currentTaskId),
     currentStudyGoalId: normalizeOwnedStudyGoalId(userId, req.body?.currentStudyGoalId),
+    longGoalOnboardingCompleted: req.body?.longGoalOnboardingCompleted === undefined
+      ? Boolean(current.long_goal_onboarding_completed)
+      : Boolean(req.body.longGoalOnboardingCompleted),
     updatedAt: nowIso()
   };
 
@@ -238,6 +244,7 @@ app.put("/api/settings", requireAuth, (req, res) => {
         next_rest_type = ?,
         current_task_id = ?,
         current_study_goal_id = ?,
+        long_goal_onboarding_completed = ?,
         updated_at = ?
     WHERE user_id = ?
   `).run(
@@ -247,6 +254,7 @@ app.put("/api/settings", requireAuth, (req, res) => {
     next.nextRestType,
     next.currentTaskId,
     next.currentStudyGoalId,
+    Number(next.longGoalOnboardingCompleted),
     next.updatedAt,
     userId
   );
@@ -347,6 +355,7 @@ app.post("/api/tasks", requireAuth, (req, res) => {
   const suggestedForDate = source ? normalizeOptionalDateKey(req.body?.suggestedForDate) : null;
   const aiGeneratedAt = source ? normalizeOptionalString(req.body?.aiGeneratedAt, 40) : null;
   const xpEarned = clampInteger(req.body?.xpEarned, 0, 0, 1000);
+  const studyGoalId = normalizeOwnedStudyGoalId(req.auth.user.id, req.body?.studyGoalId);
 
   if (clientId) {
     const existing = db.prepare(`
@@ -355,14 +364,15 @@ app.post("/api/tasks", requireAuth, (req, res) => {
     `).get(req.auth.user.id, clientId);
 
     if (existing) {
-      if (source && !existing.source) {
+      if ((source && !existing.source) || (studyGoalId && !existing.study_goal_id)) {
         db.prepare(`
           UPDATE tasks
-          SET source = ?,
-              source_label = ?,
-              source_date_key = ?,
-              suggested_for_date = ?,
-              ai_generated_at = ?,
+          SET source = COALESCE(source, ?),
+              source_label = COALESCE(source_label, ?),
+              source_date_key = COALESCE(source_date_key, ?),
+              suggested_for_date = COALESCE(suggested_for_date, ?),
+              ai_generated_at = COALESCE(ai_generated_at, ?),
+              study_goal_id = COALESCE(study_goal_id, ?),
               updated_at = ?
           WHERE id = ? AND user_id = ?
         `).run(
@@ -371,6 +381,7 @@ app.post("/api/tasks", requireAuth, (req, res) => {
           sourceDateKey,
           suggestedForDate,
           aiGeneratedAt,
+          studyGoalId,
           nowIso(),
           existing.id,
           req.auth.user.id
@@ -403,6 +414,7 @@ app.post("/api/tasks", requireAuth, (req, res) => {
     suggestedForDate,
     aiGeneratedAt,
     xpEarned,
+    studyGoalId,
     updatedAt: nowIso()
   };
 
@@ -423,9 +435,10 @@ app.post("/api/tasks", requireAuth, (req, res) => {
       suggested_for_date,
       ai_generated_at,
       xp_earned,
+      study_goal_id,
       updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     task.id,
     task.userId,
@@ -442,6 +455,7 @@ app.post("/api/tasks", requireAuth, (req, res) => {
     task.suggestedForDate,
     task.aiGeneratedAt,
     task.xpEarned,
+    task.studyGoalId,
     task.updatedAt
   );
 
@@ -469,6 +483,9 @@ app.patch("/api/tasks/:taskId", requireAuth, (req, res) => {
     clampInteger(req.body?.xpEarned, 0, 0, 1000),
   );
   const updatedAt = nowIso();
+  const studyGoalId = req.body?.studyGoalId === undefined
+    ? current.study_goal_id
+    : normalizeOwnedStudyGoalId(req.auth.user.id, req.body.studyGoalId);
 
   db.prepare(`
     UPDATE tasks
@@ -476,9 +493,10 @@ app.patch("/api/tasks/:taskId", requireAuth, (req, res) => {
         completed = ?,
         completed_at = ?,
         xp_earned = ?,
+        study_goal_id = ?,
         updated_at = ?
     WHERE id = ? AND user_id = ?
-  `).run(title, completed, completedAt, xpEarned, updatedAt, req.params.taskId, req.auth.user.id);
+  `).run(title, completed, completedAt, xpEarned, studyGoalId, updatedAt, req.params.taskId, req.auth.user.id);
 
   const task = db.prepare("SELECT * FROM tasks WHERE id = ?").get(req.params.taskId);
   res.json({ task: taskFromRow(task) });
@@ -499,7 +517,10 @@ app.get("/api/study-goals", requireAuth, (req, res) => {
   const rows = db.prepare(`
     SELECT
       study_goals.*,
-      COALESCE(SUM(CASE WHEN focus_sessions.mode = 'focus' THEN focus_sessions.minutes ELSE 0 END), 0) AS focus_minutes
+      COALESCE(SUM(CASE WHEN focus_sessions.mode = 'focus' THEN focus_sessions.minutes ELSE 0 END), 0) AS focus_minutes,
+      COALESCE(SUM(CASE
+        WHEN focus_sessions.mode = 'focus' AND focus_sessions.date_key >= date('now', '-6 days')
+        THEN focus_sessions.minutes ELSE 0 END), 0) AS recent_focus_minutes
     FROM study_goals
     LEFT JOIN focus_sessions
       ON focus_sessions.study_goal_id = study_goals.id
@@ -521,6 +542,9 @@ app.post("/api/study-goals", requireAuth, (req, res) => {
   }
 
   const clientId = normalizeOptionalString(req.body?.clientId, 120);
+  const isPrimary = req.body?.isPrimary === true || !db.prepare(`
+    SELECT id FROM study_goals WHERE user_id = ? AND completed = 0 LIMIT 1
+  `).get(req.auth.user.id);
 
   if (clientId) {
     const existing = db.prepare(`
@@ -539,13 +563,20 @@ app.post("/api/study-goals", requireAuth, (req, res) => {
     userId: req.auth.user.id,
     clientId,
     title,
+    description: normalizeOptionalString(req.body?.description, 240) || "",
     targetMinutes: clampInteger(req.body?.targetMinutes, 0, 0, 99999),
+    weeklyTargetMinutes: clampInteger(req.body?.weeklyTargetMinutes, 0, 0, 10080),
     targetDate: normalizeOptionalDateKey(req.body?.targetDate),
+    isPrimary: Number(isPrimary),
     completed: typeof req.body?.completed === "boolean" ? Number(req.body.completed) : 0,
     createdAt: nowIso(),
     completedAt: req.body?.completed === true ? nowIso() : null,
     updatedAt: nowIso()
   };
+
+  if (goal.isPrimary) {
+    db.prepare("UPDATE study_goals SET is_primary = 0 WHERE user_id = ?").run(goal.userId);
+  }
 
   db.prepare(`
     INSERT INTO study_goals (
@@ -553,26 +584,38 @@ app.post("/api/study-goals", requireAuth, (req, res) => {
       user_id,
       client_id,
       title,
+      description,
       target_minutes,
+      weekly_target_minutes,
       target_date,
+      is_primary,
       completed,
       created_at,
       completed_at,
       updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     goal.id,
     goal.userId,
     goal.clientId,
     goal.title,
+    goal.description,
     goal.targetMinutes,
+    goal.weeklyTargetMinutes,
     goal.targetDate,
+    goal.isPrimary,
     goal.completed,
     goal.createdAt,
     goal.completedAt,
     goal.updatedAt
   );
+
+  db.prepare(`
+    UPDATE user_settings
+    SET long_goal_onboarding_completed = 1, current_study_goal_id = ?, updated_at = ?
+    WHERE user_id = ?
+  `).run(goal.id, nowIso(), goal.userId);
 
   res.status(201).json({ studyGoal: goalFromRow(toStudyGoalRow(goal)) });
 });
@@ -597,23 +640,40 @@ app.patch("/api/study-goals/:goalId", requireAuth, (req, res) => {
   const targetDate = req.body?.targetDate === undefined
     ? current.target_date
     : normalizeOptionalDateKey(req.body.targetDate);
+  const description = req.body?.description === undefined
+    ? current.description
+    : (normalizeOptionalString(req.body.description, 240) || "");
+  const weeklyTargetMinutes = req.body?.weeklyTargetMinutes === undefined
+    ? current.weekly_target_minutes
+    : clampInteger(req.body.weeklyTargetMinutes, current.weekly_target_minutes, 0, 10080);
+  const isPrimary = req.body?.isPrimary === undefined ? current.is_primary : Number(Boolean(req.body.isPrimary));
   const completed = typeof req.body?.completed === "boolean" ? Number(req.body.completed) : current.completed;
   const completedAt = completed && !current.completed_at ? nowIso() : (completed ? current.completed_at : null);
   const updatedAt = nowIso();
 
+  if (isPrimary) {
+    db.prepare("UPDATE study_goals SET is_primary = 0 WHERE user_id = ?").run(req.auth.user.id);
+  }
+
   db.prepare(`
     UPDATE study_goals
     SET title = ?,
+        description = ?,
         target_minutes = ?,
+        weekly_target_minutes = ?,
         target_date = ?,
+        is_primary = ?,
         completed = ?,
         completed_at = ?,
         updated_at = ?
     WHERE id = ? AND user_id = ?
   `).run(
     title,
+    description,
     targetMinutes,
+    weeklyTargetMinutes,
     targetDate,
+    isPrimary,
     completed,
     completedAt,
     updatedAt,
@@ -781,6 +841,29 @@ app.get("/api/stats", requireAuth, (req, res) => {
     return summary;
   }, { completedCount: 0, focusMinutes: 0, xpEarned: 0 });
   const summary = buildStatsSummary(days, totals);
+  const goalBreakdown = db.prepare(`
+    SELECT
+      study_goals.id,
+      study_goals.title,
+      study_goals.is_primary AS isPrimary,
+      COALESCE(SUM(focus_sessions.minutes), 0) AS focusMinutes,
+      COUNT(focus_sessions.id) AS completedCount
+    FROM study_goals
+    LEFT JOIN focus_sessions
+      ON focus_sessions.study_goal_id = study_goals.id
+      AND focus_sessions.user_id = study_goals.user_id
+      AND focus_sessions.mode = 'focus'
+      AND focus_sessions.date_key >= ?
+    WHERE study_goals.user_id = ?
+    GROUP BY study_goals.id
+    ORDER BY isPrimary DESC, focusMinutes DESC
+  `).all(formatDateKey(startDate), req.auth.user.id).map((goal) => ({
+    id: goal.id,
+    title: goal.title,
+    isPrimary: Boolean(goal.isPrimary),
+    focusMinutes: Number(goal.focusMinutes) || 0,
+    completedCount: Number(goal.completedCount) || 0,
+  }));
 
   res.json({
     range,
@@ -788,7 +871,8 @@ app.get("/api/stats", requireAuth, (req, res) => {
     endAt: endDate.toISOString(),
     totals,
     summary,
-    days
+    days,
+    goalBreakdown
   });
 });
 
@@ -993,6 +1077,7 @@ function toTaskRow(task) {
     client_id: task.clientId,
     date_key: task.dateKey,
     title: task.title,
+    study_goal_id: task.studyGoalId,
     completed: task.completed,
     created_at: task.createdAt,
     completed_at: task.completedAt,
@@ -1012,8 +1097,11 @@ function toStudyGoalRow(goal) {
     id: goal.id,
     client_id: goal.clientId,
     title: goal.title,
+    description: goal.description,
     target_minutes: goal.targetMinutes,
+    weekly_target_minutes: goal.weeklyTargetMinutes,
     target_date: goal.targetDate,
+    is_primary: goal.isPrimary,
     completed: goal.completed,
     created_at: goal.createdAt,
     completed_at: goal.completedAt,

@@ -24,6 +24,7 @@ export function mergeCloudTasks({ cloudTasks, dailyPlans, deletedTaskIds, todayK
         clientId: task.clientId,
         syncedTaskId: task.id,
         title: task.title,
+        studyGoalId: task.studyGoalId || metadata?.studyGoalId || "",
         completed: task.completed,
         createdAt: task.createdAt,
         completedAt: task.completedAt,

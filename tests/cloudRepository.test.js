@@ -15,7 +15,12 @@ test("cloud repository owns endpoint paths and request payloads", async () => {
     password: "password123",
     displayName: "Student",
   });
-  await repository.createTask({ id: "local-1", title: "数学真题", completed: false }, "2026-07-12");
+  await repository.createTask({
+    id: "local-1",
+    title: "数学真题",
+    completed: false,
+    studyGoalId: "goal-math",
+  }, "2026-07-12");
   await repository.updateSettings({ focusDuration: 50, dailyGoal: 8 });
   await repository.generateDailySummary("2026-07-12", true);
 
@@ -34,6 +39,7 @@ test("cloud repository owns endpoint paths and request payloads", async () => {
   assert.equal(calls[1].path, "/api/tasks");
   assert.equal(calls[1].options.body.clientId, "local-1");
   assert.equal(calls[1].options.body.dateKey, "2026-07-12");
+  assert.equal(calls[1].options.body.studyGoalId, "goal-math");
   assert.deepEqual(calls[2], {
     path: "/api/settings",
     options: { method: "PUT", body: { focusDuration: 50, dailyGoal: 8 } },

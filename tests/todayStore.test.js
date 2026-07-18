@@ -18,6 +18,7 @@ test("today store rolls daily counters while preserving settings and cumulative 
     dailyGoal: 10,
     focusDuration: 45,
     theme: "dark",
+    longGoalOnboardingCompleted: true,
     selectedPet: "penguin",
     petProgress: { petId: "penguin", level: 2, currentXP: 20, totalXP: 120, nextLevelXP: 140 },
     records: [{ task: "数学", minutes: 50 }],
@@ -32,6 +33,7 @@ test("today store rolls daily counters while preserving settings and cumulative 
   assert.equal(data.dailyGoal, 10);
   assert.equal(data.focusDuration, 45);
   assert.equal(data.theme, "dark");
+  assert.equal(data.longGoalOnboardingCompleted, true);
   assert.equal(data.petProgress.totalXP, 120);
   assert.deepEqual(data.records, []);
 });

@@ -192,8 +192,17 @@ test("task, goal, and focus-record modules preserve domain metadata", () => {
   assert.equal(resolveExecutableTaskSelection([manual, ai]).changed, true);
   assert.equal(resolveExecutableTaskSelection([{ ...manual, completed: true }], "manual").task, null);
 
-  const goal = normalizeStudyGoal({ id: "goal-1", title: " 政治背诵 ", targetMinutes: 120 });
+  const goal = normalizeStudyGoal({
+    id: "goal-1",
+    title: " 政治背诵 ",
+    description: "完成一轮框架背诵",
+    targetMinutes: 120,
+    weeklyTargetMinutes: 600,
+    isPrimary: true,
+  });
   assert.equal(goal.title, "政治背诵");
+  assert.equal(goal.weeklyTargetMinutes, 600);
+  assert.equal(goal.isPrimary, true);
   assert.equal(sortStudyGoals(goal, { ...goal, completed: true }), -1);
 
   const record = normalizeFocusRecord({ task: "数学错题", minutes: 50, endedAt: "2026-07-11T10:00:00Z" });
@@ -249,7 +258,7 @@ test("AI suggestions are normalized and cannot be adopted twice", () => {
   });
   const adoption = getAiTomorrowAdoptionState(suggestions, [{ title: "数学错题" }]);
 
-  assert.deepEqual(suggestions, ["数学错题", "英语阅读"]);
+  assert.deepEqual(suggestions.map((item) => item.title), ["数学错题", "英语阅读"]);
   assert.deepEqual(adoption, { total: 2, remaining: 1 });
 });
 

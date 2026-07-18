@@ -1248,6 +1248,91 @@ body.dark .ai-diagnosis-card {
     var(--soft);
 }
 
+.ai-goal-plan li {
+  display: grid;
+  gap: 4px;
+}
+
+.ai-goal-plan li em {
+  width: fit-content;
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: var(--brand);
+  background: var(--soft);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.ai-goal-plan li small {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.goal-allocation {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  background: var(--soft);
+}
+
+.goal-allocation-head,
+.goal-allocation article > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.goal-allocation-head {
+  justify-content: space-between;
+}
+
+.goal-allocation-head span,
+.goal-allocation article span {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.goal-allocation article {
+  display: grid;
+  gap: 6px;
+}
+
+.goal-allocation article strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.goal-allocation article em {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--brand);
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.goal-allocation article > i {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(37, 99, 90, 0.12);
+}
+
+.goal-allocation article b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--brand), var(--gold));
+}
+
 .ai-follow-through-note {
   margin: -4px 4px 0;
   color: var(--muted);
@@ -1365,7 +1450,7 @@ body.dark .ai-diagnosis-card {
 
 .study-goal-form {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(90px, 0.6fr) minmax(120px, 0.7fr);
+  grid-template-columns: minmax(0, 1.4fr) minmax(90px, 0.55fr) minmax(90px, 0.5fr);
   gap: 10px;
 }
 
@@ -1437,6 +1522,25 @@ body.dark .ai-diagnosis-card {
   font-weight: 750;
 }
 
+.study-goal-main p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.study-goal-primary {
+  display: inline-block;
+  margin-top: 5px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--brand);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+}
+
 .study-goal-progress {
   height: 8px;
   margin-top: 9px;
@@ -1452,8 +1556,45 @@ body.dark .ai-diagnosis-card {
   background: linear-gradient(90deg, var(--brand), var(--gold));
 }
 
-.study-goal-delete {
+.study-goal-actions {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+}
+
+.study-goal-delete,
+.study-goal-actions .text-btn {
   white-space: nowrap;
+}
+
+.study-goal-inline-edit {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.study-goal-inline-edit textarea,
+.study-goal-inline-edit > div {
+  grid-column: 1 / -1;
+}
+
+.study-goal-inline-edit input,
+.study-goal-inline-edit textarea {
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card-bg);
+  color: var(--ink);
+  font: inherit;
+}
+
+.study-goal-inline-edit > div {
+  display: flex;
+  gap: 8px;
 }
 
 .study-goal-empty {

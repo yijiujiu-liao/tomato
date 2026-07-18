@@ -62,6 +62,14 @@
   font-size: 15px;
 }
 
+.task-add-row select {
+  grid-column: 1 / -1;
+  min-height: 44px;
+  border-radius: 14px;
+  color: var(--brand);
+  font-weight: 800;
+}
+
 .add-task-btn {
   min-width: 72px;
   min-height: 48px;
@@ -300,6 +308,34 @@ body.dark .task-card-front-completed {
 body.dark .task-source-badge {
   color: var(--brand-dark);
   background: rgba(119, 201, 181, 0.15);
+}
+
+.task-goal-badge {
+  display: block;
+  max-width: min(180px, 65vw);
+  margin-top: 5px;
+  padding: 3px 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  color: #765225;
+  background: rgba(239, 141, 67, 0.13);
+  font-size: 10px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-goal-badge::before {
+  content: "目标 · ";
+}
+
+.task-goal-badge.is-missing {
+  color: #a34f3b;
+  background: rgba(187, 83, 59, 0.1);
+}
+
+.task-goal-badge.is-missing::before {
+  content: "";
 }
 
 .plan-task-item[data-completed="true"] .task-title {
@@ -617,6 +653,22 @@ body.dark .task-source-badge {
 .record-task {
   font-size: 16px;
   font-weight: 800;
+}
+
+.record-goal {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 7px;
+  padding: 3px 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  color: var(--brand);
+  background: rgba(37, 99, 90, 0.1);
+  font-size: 10px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .empty-record {

@@ -11,6 +11,7 @@ export function createFocusSessionPageView(elements) {
     totalSeconds,
     running,
     taskTitle,
+    goalTitle,
     progress,
     selectedPet,
   }) {
@@ -23,7 +24,10 @@ export function createFocusSessionPageView(elements) {
 
     elements.shell.dataset.mode = mode;
     elements.shell.dataset.sessionState = sessionState;
-    elements.eyebrow.textContent = mode === "rest" ? "正在休息" : (running ? "正在专注" : "专注已暂停");
+    const focusState = running ? "正在专注" : "专注已暂停";
+    elements.eyebrow.textContent = mode === "rest"
+      ? "正在休息"
+      : `${focusState}${goalTitle ? ` · 推进「${goalTitle}」` : ""}`;
     elements.task.textContent = mode === "rest" ? "让大脑安静恢复一下" : (taskTitle || "当前专注任务");
     elements.time.textContent = formatTime(remainingSeconds);
     elements.progress.textContent = mode === "rest"

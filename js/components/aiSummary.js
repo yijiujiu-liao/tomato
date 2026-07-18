@@ -42,7 +42,28 @@ export function renderAiSummaryList(title, items, escape = escapeHtml) {
     <section class="ai-summary-section">
       <strong>${title}</strong>
       <ul>
-        ${items.map((item) => `<li>${escape(item)}</li>`).join("")}
+        ${items.map((item) => `<li>${escape(typeof item === "string" ? item : item.title)}</li>`).join("")}
+      </ul>
+    </section>
+  `;
+}
+
+export function renderAiTomorrowPlan(items, escape = escapeHtml) {
+  if (!Array.isArray(items) || items.length === 0) return "";
+  return `
+    <section class="ai-summary-section ai-goal-plan">
+      <strong>明日目标行动</strong>
+      <ul>
+        ${items.map((item) => {
+          const suggestion = typeof item === "string"
+            ? { title: item, goalTitle: "", reason: "" }
+            : item;
+          return `<li>
+            <span>${escape(suggestion.title)}</span>
+            ${suggestion.goalTitle ? `<em>${escape(suggestion.goalTitle)}</em>` : ""}
+            ${suggestion.reason ? `<small>${escape(suggestion.reason)}</small>` : ""}
+          </li>`;
+        }).join("")}
       </ul>
     </section>
   `;
@@ -132,10 +153,10 @@ function renderAiSummaryPanel({
     </article>
     ${renderAiSummaryList("亮点", state.data.highlights)}
     ${renderAiSummaryList("风险提醒", state.data.risks)}
-    ${renderAiSummaryList("明日可执行任务", state.data.tomorrowPlan)}
+    ${renderAiTomorrowPlan(state.data.tomorrowPlan)}
     <blockquote class="ai-summary-encouragement">${escapeHtml(state.data.encouragement)}</blockquote>
     <button class="secondary-btn ai-summary-adopt" type="button">${escapeHtml(adoptButtonText)}</button>
-    <p class="ai-follow-through-note">采纳后的完成情况会进入下一次 AI 复盘，用来调整后续任务数量和范围。</p>
+    <p class="ai-follow-through-note">每条建议都绑定长期目标；采纳后的完成情况会进入下一次 AI 复盘，继续校准目标进度。</p>
   `;
 
   const adoptButton = body.querySelector(".ai-summary-adopt");

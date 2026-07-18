@@ -33,7 +33,17 @@ export const DAILY_SUMMARY_SCHEMA = {
     },
     tomorrowPlan: {
       type: "array",
-      items: { type: "string" },
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["title", "studyGoalId", "goalTitle", "reason"],
+        properties: {
+          title: { type: "string" },
+          studyGoalId: { type: "string" },
+          goalTitle: { type: "string" },
+          reason: { type: "string" },
+        },
+      },
       maxItems: 3,
     },
     encouragement: { type: "string" },
@@ -58,7 +68,9 @@ export function createAiCoachUserPrompt(context, { strictJson = false } = {}) {
     "请生成当天学习复盘。",
     "diagnosis.headline 用一句话指出今天最关键的执行问题或优势；diagnosis.evidence 必须引用数据中的任务数、完成率、番茄数、分钟数或近 7 天节奏；diagnosis.nextAction 只写明天第一个应该执行的动作。",
     "如果 executionSignals 中存在 aiFollowThrough，必须评估之前 AI 建议的实际完成情况；完成率低时应减少明日建议数量和范围，而不是继续堆任务。",
-    "tomorrowPlan 只能包含 1 到 3 个可直接添加为任务的短标题，每项不超过 30 个汉字，必须包含科目或对象、动作和明确范围，优先承接未完成任务与投入不足项。禁止写‘继续努力’‘保持状态’等空泛建议。",
+    "先判断 active studyGoals 的期限、累计进度、每周目标与近 7 天投入差距，所有诊断和建议都必须服务于这些长期目标。",
+    "tomorrowPlan 只能包含 1 到 3 个对象；title 是可直接添加为任务的短标题，不超过 30 个汉字，必须包含对象、动作和明确范围；studyGoalId 必须使用学习数据里仍进行中的真实目标 id；goalTitle 必须与该 id 对应；reason 用一句话解释该任务为什么能推进目标。禁止写‘继续努力’‘保持状态’等空泛建议。",
+    "如果存在未归属长期目标的任务，要在 risks 中指出；不要为已完成目标继续安排任务。",
     "todaySummary、highlights、risks 和 encouragement 保持简洁，不重复同一句话。",
     outputRule,
     `学习数据：${JSON.stringify(context)}`,
@@ -67,7 +79,7 @@ export function createAiCoachUserPrompt(context, { strictJson = false } = {}) {
 
 export function normalizeDailySummary(summary) {
   const risks = normalizeSummaryList(summary?.risks, 3);
-  const tomorrowPlan = normalizeSummaryList(summary?.tomorrowPlan, 3, 60);
+  const tomorrowPlan = normalizeTomorrowPlan(summary?.tomorrowPlan, 3);
   const diagnosis = normalizeDiagnosis(summary?.diagnosis, { risks, tomorrowPlan });
 
   return {
@@ -166,7 +178,7 @@ export function buildExecutionSignals({
 
 function normalizeDiagnosis(value, { risks, tomorrowPlan }) {
   const fallbackIssue = risks[0] || "今天已经留下学习记录，但还需要继续观察执行节奏。";
-  const fallbackAction = tomorrowPlan[0] || "先完成明天第一轮番茄。";
+  const fallbackAction = tomorrowPlan[0]?.title || "先完成明天第一轮番茄。";
 
   return {
     headline: normalizeText(value?.headline, fallbackIssue, 120),
@@ -199,6 +211,25 @@ function normalizeSummaryList(value, maxItems, maxLength = 180) {
     .map((item) => String(item || "").trim().slice(0, maxLength))
     .filter(Boolean)
     .slice(0, maxItems);
+}
+
+function normalizeTomorrowPlan(value, maxItems) {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => {
+    if (typeof item === "string") {
+      const title = item.trim().slice(0, 60);
+      return title ? { title, studyGoalId: "", goalTitle: "", reason: "" } : null;
+    }
+    if (!item || typeof item !== "object") return null;
+    const title = String(item.title || "").trim().slice(0, 60);
+    if (!title) return null;
+    return {
+      title,
+      studyGoalId: String(item.studyGoalId || "").trim().slice(0, 120),
+      goalTitle: String(item.goalTitle || "").trim().slice(0, 80),
+      reason: String(item.reason || "").trim().slice(0, 180),
+    };
+  }).filter(Boolean).slice(0, maxItems);
 }
 
 function normalizeText(value, fallback, maxLength) {

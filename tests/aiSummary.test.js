@@ -87,7 +87,12 @@ test("AI service sends structured execution coaching prompts and normalizes mode
                 },
                 highlights: ["完成两轮"],
                 risks: ["任务完成率偏低"],
-                tomorrowPlan: ["数学：复盘 10 道错题"],
+                tomorrowPlan: [{
+                  title: "数学：复盘 10 道错题",
+                  studyGoalId: "goal-math",
+                  goalTitle: "数学强化二轮",
+                  reason: "补齐近期错题复盘投入。",
+                }],
                 encouragement: "先完成第一件。",
               }),
             },
@@ -100,5 +105,7 @@ test("AI service sends structured execution coaching prompts and normalizes mode
   const summary = await service.generateDailySummary({ executionSignals: { today: {} } });
   assert.equal(summary.diagnosis.headline, "计划多于执行");
   assert.equal(summary.tomorrowPlan.length, 1);
+  assert.equal(summary.tomorrowPlan[0].studyGoalId, "goal-math");
   assert.match(requestBody.messages[1].content, /完成率低时应减少明日建议数量/);
+  assert.match(requestBody.messages[1].content, /长期目标/);
 });

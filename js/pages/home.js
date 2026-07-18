@@ -40,7 +40,7 @@ export function getHomePetCompanionState({ tasks, todayData, messageIndex = 0 })
   };
 }
 
-export function renderHomePage({ elements, tasks, todayData, formatPlanDate, messageIndex = 0 }) {
+export function renderHomePage({ elements, tasks, todayData, studyGoals = [], formatPlanDate, messageIndex = 0 }) {
   document.body.classList.toggle("has-no-tasks", tasks.length === 0);
   const progress = todayData.petProgress || createPetProgress(todayData.selectedPet);
   const petId = normalizePetType(progress.petId || todayData.selectedPet);
@@ -52,6 +52,7 @@ export function renderHomePage({ elements, tasks, todayData, formatPlanDate, mes
     elements,
     tasks,
     todayData,
+    studyGoals,
     formatPlanDate,
   });
   renderAiPlanBanner(elements, tasks);
@@ -95,6 +96,7 @@ export function renderHomePageView({
   elements,
   tasks,
   todayData,
+  studyGoals = [],
   formatPlanDate
 }) {
   if (!elements.homeDateText) {
@@ -117,10 +119,11 @@ export function renderHomePageView({
   }
 
   if (selectedTask) {
+    const goalTitle = studyGoals.find((goal) => goal.id === selectedTask.studyGoalId)?.title;
     elements.homeNextTaskTitle.textContent = selectedTask.title;
-    elements.homeNextTaskHint.textContent = selectedTask.source === "ai"
-      ? "来自 AI 明日建议，已经准备好开始。"
-      : "已选为当前专注任务，可以开始番茄钟。";
+    elements.homeNextTaskHint.textContent = goalTitle
+      ? `${selectedTask.source === "ai" ? "AI 建议" : "当前任务"} · 正在推进「${goalTitle}」`
+      : "开始前，请先为这个任务选择长期目标。";
     return;
   }
 

@@ -120,7 +120,10 @@ test("AI HTTP loop generates, caches, refreshes, and restores an execution revie
   assert.equal(generated.cached, false);
   assert.equal(generated.source, "deepseek");
   assert.equal(generated.summary.diagnosis.nextAction, "英语：精读 1 篇阅读");
-  assert.deepEqual(generated.summary.tomorrowPlan, ["英语：精读 1 篇阅读", "数学：复盘 10 道错题"]);
+  assert.deepEqual(
+    generated.summary.tomorrowPlan.map((item) => item.title),
+    ["英语：精读 1 篇阅读", "数学：复盘 10 道错题"],
+  );
   assert.equal(providerCalls, 1);
   assert.match(lastProviderRequest.messages[1].content, /数学：整理 10 道错题/);
   assert.match(lastProviderRequest.messages[1].content, /taskCompletionRate/);
@@ -173,13 +176,14 @@ test("AI HTTP loop generates, caches, refreshes, and restores an execution revie
     token,
     body: { clientId: "manual-tomorrow", title: "政治：背诵一节", dateKey: tomorrowKey },
   });
-  for (const [index, title] of restored.summary.tomorrowPlan.entries()) {
+  for (const [index, suggestion] of restored.summary.tomorrowPlan.entries()) {
     await request(baseUrl, "/api/tasks", {
       method: "POST",
       token,
       body: {
         clientId: `ai-tomorrow-${index}`,
-        title,
+        title: suggestion.title,
+        studyGoalId: suggestion.studyGoalId || null,
         dateKey: tomorrowKey,
         source: "ai",
         sourceLabel: "AI 明日建议",

@@ -26,6 +26,7 @@ export function createDataPageView({ page, onRangeChange }) {
       </div>
       <p class="stats-sync-hint" id="statsSyncHint"></p>
       <div class="cloud-stats-summary" id="cloudStatsSummary"></div>
+      <section class="goal-allocation" id="goalAllocation" aria-label="长期目标投入分布"></section>
       <div class="cloud-stats-chart" id="cloudStatsChart" aria-label="学习趋势图"></div>
       <details class="stats-heatmap-wrap">
         <summary class="stats-heatmap-head"><strong>近 30 天稳定度</strong><span id="statsHeatmapCaption"></span></summary>
@@ -47,7 +48,7 @@ export function createDataPageView({ page, onRangeChange }) {
       <p>有了第一条记录后，系统才能判断今天的执行节奏。</p>
     </article>
     <details class="diagnosis-details">
-      <summary>查看 4 项诊断依据</summary>
+      <summary>查看 5 项诊断依据</summary>
       <div class="diagnosis-list" id="studyDiagnosisList"></div>
     </details>
   `;
@@ -68,12 +69,14 @@ export function createDataPageView({ page, onRangeChange }) {
     const hint = statsPanel.querySelector("#statsSyncHint");
     const summary = statsPanel.querySelector("#cloudStatsSummary");
     const chart = statsPanel.querySelector("#cloudStatsChart");
+    const goalAllocation = statsPanel.querySelector("#goalAllocation");
     const heatmap = statsPanel.querySelector("#statsHeatmap");
     const caption = statsPanel.querySelector("#statsHeatmapCaption");
 
     if (!cloudEnabled) {
       hint.textContent = "登录后可查看跨设备累计的每日、每周、每月学习统计。";
       summary.innerHTML = renderMetrics(localTotals);
+      renderGoalAllocation(goalAllocation, localTotals.goalBreakdown || []);
       chart.innerHTML = '<p class="cloud-stats-empty">当前是本地模式，登录后专注记录会沉淀为长期曲线。</p>';
       caption.textContent = "本地模式暂不生成跨设备热力图";
       renderHeatmap(heatmap, []);
@@ -104,6 +107,7 @@ export function createDataPageView({ page, onRangeChange }) {
       averageDailyMinutes: rhythm.averageDailyMinutes,
       currentStreakDays: rhythm.currentStreakDays,
     });
+    renderGoalAllocation(goalAllocation, stats.data?.goalBreakdown || []);
     renderChart(chart, stats.data?.days || []);
     renderHeatmap(heatmap, stats.data?.days || []);
     caption.textContent = buildHeatmapCaption(stats.data?.summary);
@@ -134,6 +138,25 @@ export function createDataPageView({ page, onRangeChange }) {
   }
 
   return { statsPanel, diagnosisPanel, renderStats, renderDiagnosis, renderTodayStats };
+}
+
+function renderGoalAllocation(container, goals) {
+  if (!Array.isArray(goals) || goals.length === 0) {
+    container.innerHTML = '<p class="cloud-stats-empty">建立长期目标后，这里会显示每个方向的真实投入。</p>';
+    return;
+  }
+  const totalMinutes = Math.max(1, goals.reduce((sum, goal) => sum + (Number(goal.focusMinutes) || 0), 0));
+  container.innerHTML = `
+    <div class="goal-allocation-head"><strong>目标投入分布</strong><span>按当前统计范围</span></div>
+    ${goals.map((goal) => {
+      const minutes = Number(goal.focusMinutes) || 0;
+      const percent = Math.round((minutes / totalMinutes) * 100);
+      return `<article>
+        <div><strong>${escapeHtml(goal.title)}</strong>${goal.isPrimary ? "<em>主目标</em>" : ""}<span>${minutes} 分钟 · ${percent}%</span></div>
+        <i><b style="width:${percent}%"></b></i>
+      </article>`;
+    }).join("")}
+  `;
 }
 
 function renderMetrics(values) {

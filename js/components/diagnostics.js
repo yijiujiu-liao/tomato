@@ -19,6 +19,15 @@ export function buildStudyDiagnosticItems({
   const hasSubjectEvidence = Object.keys(subjectMinutes).length > 0;
   const weakestSubject = hasSubjectEvidence ? findWeakestSubject(studyGoals, subjectMinutes) : null;
   const topSubject = Object.entries(subjectMinutes).sort((a, b) => b[1] - a[1])[0];
+  const activeGoals = studyGoals.filter((goal) => !goal.completed);
+  const linkedTasks = todayTasks.filter((task) => task.studyGoalId).length;
+  const linkedRate = totalTasks ? Math.round((linkedTasks / totalTasks) * 100) : 0;
+  const primaryGoal = activeGoals.find((goal) => goal.isPrimary) || activeGoals[0];
+  const weeklyTargetMinutes = Number(primaryGoal?.weeklyTargetMinutes) || 0;
+  const recentGoalMinutes = Number(primaryGoal?.recentFocusMinutes) || 0;
+  const weeklyGoalRate = weeklyTargetMinutes
+    ? Math.round((recentGoalMinutes / weeklyTargetMinutes) * 100)
+    : null;
 
   return [
     {
@@ -50,6 +59,19 @@ export function buildStudyDiagnosticItems({
         : weakestSubject
         ? `${weakestSubject} 最近记录偏少，明天至少安排 1 个番茄补上。`
         : `${topSubject[0]} 投入最多，累计 ${topSubject[1]} 分钟。`
+    },
+    {
+      title: "长期目标有没有推进",
+      level: !primaryGoal
+        ? "bad"
+        : (totalTasks > 0 && linkedRate >= 80 && (weeklyGoalRate === null || weeklyGoalRate >= 50) ? "good" : "warn"),
+      text: !primaryGoal
+        ? "还没有进行中的长期目标，任务和番茄无法形成长期积累。"
+        : totalTasks === 0
+        ? `主目标是「${primaryGoal.title}」。先为它安排今天第一件可执行任务。`
+        : `${linkedRate}% 的今日任务已绑定长期目标。${linkedRate < 80
+          ? "还有任务没有方向，开始前先补全归属。"
+          : `近 7 天已为「${primaryGoal.title}」投入 ${recentGoalMinutes}${weeklyTargetMinutes ? ` / ${weeklyTargetMinutes}` : ""} 分钟。`}`
     }
   ];
 }
@@ -88,5 +110,8 @@ function findWeakestSubject(studyGoals, subjectMinutes) {
     .filter(Boolean)
     .slice(0, 4);
 
-  return subjectHints.find((subject) => !subjectMinutes[subject]);
+  const recordedSubjects = Object.keys(subjectMinutes);
+  return subjectHints.find((subject) => !recordedSubjects.some((recorded) => (
+    subject.startsWith(recorded) || recorded.startsWith(subject)
+  )));
 }

@@ -37,7 +37,7 @@ import { buildReviewModel, renderRecordsView, renderReviewPageView } from "./js/
 import { createPetPageView } from "./js/pages/pet.js";
 import { createDataPageView } from "./js/pages/data.js";
 import { createFocusSessionPageView } from "./js/pages/focusSession.js";
-import { normalizeStudyGoal, sortStudyGoals } from "./js/goals.js";
+import { getPrimaryStudyGoal, normalizeStudyGoal, sortStudyGoals } from "./js/goals.js";
 import {
   inferTodayPetXP,
   normalizeTodayPetXP
@@ -62,6 +62,7 @@ import { createGoalController } from "./js/goalController.js";
 import { createCloudStateApplier } from "./js/cloudState.js";
 import { placeSettingsUtilities, setupAppLayout } from "./js/components/appLayout.js";
 import { createCurrentGoalView } from "./js/components/currentGoal.js";
+import { createLongGoalOnboarding } from "./js/components/longGoalOnboarding.js";
 import { createTimerEngine } from "./js/timerEngine.js";
 import {
   loadStudyGoals as readStudyGoals,
@@ -110,6 +111,7 @@ const homeNextTaskHint = document.querySelector("#homeNextTaskHint");
 const homeQuickTask = document.querySelector("#homeQuickTask");
 const homeQuickTaskInput = document.querySelector("#homeQuickTaskInput");
 const homeQuickTaskBtn = document.querySelector("#homeQuickTaskBtn");
+const homeQuickTaskGoalSelect = document.querySelector("#homeQuickTaskGoalSelect");
 const homeReviewBtn = document.querySelector("#homeReviewBtn");
 const aiPlanBanner = document.querySelector("#aiPlanBanner");
 const aiPlanBannerTitle = document.querySelector("#aiPlanBannerTitle");
@@ -127,11 +129,14 @@ const carryOverBanner = document.querySelector("#carryOverBanner");
 const carryOverText = document.querySelector("#carryOverText");
 const carryOverBtn = document.querySelector("#carryOverBtn");
 const newTaskInput = document.querySelector("#newTaskInput");
+const newTaskGoalSelect = document.querySelector("#newTaskGoalSelect");
 const addTaskBtn = document.querySelector("#addTaskBtn");
 const taskList = document.querySelector("#taskList");
 const taskToast = document.querySelector("#taskToast");
 const taskToastText = document.querySelector("#taskToastText");
 const taskToastUndo = document.querySelector("#taskToastUndo");
+const longGoalOnboarding = document.querySelector("#longGoalOnboarding");
+const longGoalOnboardingForm = document.querySelector("#longGoalOnboardingForm");
 const goalInput = document.querySelector("#goalInput");
 const goalProgressText = document.querySelector("#goalProgressText");
 const goalProgressFill = document.querySelector("#goalProgressFill");
@@ -259,6 +264,7 @@ const tasksPage = createTasksPageController({
   onRestore: undoCompleteTask,
   onComplete: completeTaskWithAnimation,
   onDelay: delayTaskToTomorrow,
+  getGoalLabel: (goalId) => studyGoals.find((goal) => goal.id === goalId)?.title || "",
 });
 tasksPage.setRenderCurrent(renderTaskPage);
 const appNavigator = createAppNavigator({
@@ -361,6 +367,7 @@ let dataPageView = null;
 let studyGoalsPanel = null;
 let studyGoalsView = null;
 let currentGoalView = null;
+let longGoalOnboardingView = null;
 let aiSummaryView = null;
 
 let focusFlowController = null;
@@ -390,6 +397,14 @@ const cloudStatsController = createCloudStatsController({
     focusMinutes: todayData.focusMinutes,
     totalXP: todayData.petProgress.totalXP,
     dailyGoal: todayData.dailyGoal,
+    goalBreakdown: studyGoals.filter((goal) => !goal.completed).map((goal) => ({
+      id: goal.id,
+      title: goal.title,
+      isPrimary: goal.isPrimary,
+      focusMinutes: todayData.records
+        .filter((record) => record.studyGoalId === goal.id)
+        .reduce((sum, record) => sum + (Number(record.minutes) || 0), 0),
+    })),
   }),
 });
 const activeTimerController = createActiveTimerController({
@@ -469,14 +484,17 @@ const aiPlanController = createAiPlanController({
   uploadTasks: () => studySyncController.uploadTasks(),
   createTask: (task, dateKey) => studySyncController.createTask(task, dateKey),
   applyCreatedTask: (task, remoteTask) => studySyncController.applyCreatedTask(task, remoteTask),
+  getStudyGoals: () => studyGoals,
 });
 const goalController = createGoalController({
   getGoals: () => studyGoals,
   setGoals: (goals) => { studyGoals = goals; },
   getData: () => todayData,
+  taskStore,
   createGoalId: createStudyGoalId,
   saveGoals: saveStudyGoals,
   saveData: saveTodayData,
+  savePlans: saveDailyPlans,
   renderGoals: renderStudyGoals,
   updateOptions: updateCurrentGoalOptions,
   syncController: studySyncController,
@@ -599,6 +617,7 @@ switchPage(getInitialPage(), { fromHistory: true, force: true });
 setupAiSummaryUI();
 setupCloudStatsUI();
 setupStudyGoalsUI();
+setupLongGoalOnboardingUI();
 setupStudyDiagnosisUI();
 setupCurrentGoalUI();
 placeDataUtilitiesLast();
@@ -705,6 +724,7 @@ function setAuthMode(mode) {
 function enterLocalMode() {
   authController.enterLocal();
   switchPage("home");
+  ensureLongGoalOnboarding();
   window.setTimeout(() => homeQuickTaskInput?.focus(), 120);
 }
 
@@ -726,7 +746,9 @@ function toggleAuthMode() {
 }
 
 async function authenticateCredentials({ email, password, displayName }) {
-  return authController.authenticate({ email, password, displayName });
+  const authenticated = await authController.authenticate({ email, password, displayName });
+  if (authenticated) ensureLongGoalOnboarding();
+  return authenticated;
 }
 
 function setAuthFeedback(message, isError = false) {
@@ -745,7 +767,9 @@ function resetCloudAccountState() {
 }
 
 async function bootstrapCloudSession() {
-  return authController.bootstrap();
+  const restored = await authController.bootstrap();
+  ensureLongGoalOnboarding();
+  return restored;
 }
 
 function isCloudSyncEnabled() {
@@ -817,11 +841,20 @@ function setupStudyDiagnosisUI() {
 }
 
 function renderStudyDiagnosis() {
+  const goalsWithLocalProgress = studyGoals.map((goal) => ({
+    ...goal,
+    recentFocusMinutes: Math.max(
+      Number(goal.recentFocusMinutes) || 0,
+      todayData.records
+        .filter((record) => record.studyGoalId === goal.id)
+        .reduce((sum, record) => sum + (Number(record.minutes) || 0), 0),
+    ),
+  }));
   dataPageView?.renderDiagnosis({
     todayData,
     todayTasks: getTodayTasks(),
     recentPlans: getRecentPlanSummaries(7),
-    studyGoals,
+    studyGoals: goalsWithLocalProgress,
   });
 }
 
@@ -909,25 +942,85 @@ function setupStudyGoalsUI() {
     onAdd: addStudyGoal,
     onToggle: toggleStudyGoal,
     onDelete: deleteStudyGoal,
+    onUpdate: updateStudyGoal,
   });
   studyGoalsPanel = studyGoalsView.panel;
   renderStudyGoals();
 }
 
 function addStudyGoal(goalInput) {
-  return goalController.add(goalInput);
+  const goal = goalController.add(goalInput);
+  if (!goal) return null;
+  todayData.longGoalOnboardingCompleted = true;
+  if (!todayData.currentStudyGoalId) todayData.currentStudyGoalId = goal.id;
+  saveTodayData();
+  refreshGoalSelectors();
+  return goal;
+}
+
+function updateStudyGoal(goalId, patch) {
+  return goalController.update(goalId, patch);
 }
 
 function toggleStudyGoal(goalId) {
-  return goalController.toggle(goalId);
+  const changed = goalController.toggle(goalId);
+  if (changed) ensureLongGoalOnboarding();
+  return changed;
 }
 
 function deleteStudyGoal(goalId) {
-  return goalController.remove(goalId);
+  const removed = goalController.remove(goalId);
+  if (removed) ensureLongGoalOnboarding();
+  return removed;
 }
 
 function renderStudyGoals() {
   studyGoalsView?.render(studyGoals);
+  refreshGoalSelectors();
+}
+
+function setupLongGoalOnboardingUI() {
+  longGoalOnboardingView = createLongGoalOnboarding({
+    root: longGoalOnboarding,
+    form: longGoalOnboardingForm,
+    onSubmit: submitLongGoalOnboarding,
+  });
+}
+
+async function submitLongGoalOnboarding(input) {
+  const deadline = new Date(`${input.targetDate}T00:00:00`);
+  const weeks = Math.max(1, Math.ceil((deadline.getTime() - Date.now()) / (7 * 86400000)));
+  const goal = addStudyGoal({
+    ...input,
+    targetMinutes: Math.min(99999, input.weeklyTargetMinutes * weeks),
+  });
+  if (!goal) return false;
+  todayData.currentStudyGoalId = goal.id;
+  todayData.longGoalOnboardingCompleted = true;
+  saveTodayData(false);
+  render();
+  if (isCloudSyncEnabled()) await performFullCloudSync("正在同步你的长期目标...");
+  showTaskToast("长期目标已建立。接下来每个番茄都会留下方向。");
+  return true;
+}
+
+function ensureLongGoalOnboarding() {
+  const authState = authController.getState();
+  const hasAccess = authState.localAccessGranted || Boolean(authState.session?.token);
+  if (!hasAccess || !longGoalOnboardingView) return;
+  if (studyGoals.some((goal) => !goal.completed)) {
+    if (!todayData.longGoalOnboardingCompleted) {
+      todayData.longGoalOnboardingCompleted = true;
+      saveTodayData(false);
+    }
+    longGoalOnboardingView.close();
+    return;
+  }
+  longGoalOnboardingView.open({
+    message: todayData.longGoalOnboardingCompleted
+      ? "当前没有进行中的长期目标，请先重新建立方向。"
+      : "",
+  });
 }
 
 function setupCurrentGoalUI() {
@@ -1062,7 +1155,13 @@ function saveDailyPlans() {
 }
 
 function loadStudyGoals() {
-  return readStudyGoals(localStorage, STUDY_GOALS_KEY, normalizeStudyGoal, sortStudyGoals);
+  const goals = readStudyGoals(localStorage, STUDY_GOALS_KEY, normalizeStudyGoal, sortStudyGoals);
+  if (goals.some((goal) => !goal.completed) && !goals.some((goal) => !goal.completed && goal.isPrimary)) {
+    const firstActive = goals.find((goal) => !goal.completed);
+    firstActive.isPrimary = true;
+    saveJson(localStorage, STUDY_GOALS_KEY, goals);
+  }
+  return goals.sort(sortStudyGoals);
 }
 
 function saveStudyGoals() {
@@ -1077,8 +1176,14 @@ function getTodayTasks() {
   return taskStore.getTasks(getTodayKey(), { create: true });
 }
 
-function addTask(title) {
-  return taskController.add(title);
+function addTask(title, studyGoalId) {
+  const goal = studyGoals.find((item) => item.id === studyGoalId && !item.completed);
+  if (!goal) {
+    ensureLongGoalOnboarding();
+    showTaskToast("先选择这个任务要推进的长期目标。");
+    return false;
+  }
+  return taskController.add(title, goal.id);
 }
 
 function editTask(taskId, newTitle) {
@@ -1117,6 +1222,7 @@ function updateCurrentTaskOptions() {
   if (result.changed) {
     todayData.currentTaskId = result.selected?.id || "";
     todayData.currentTask = result.selected?.title || "";
+    todayData.currentStudyGoalId = result.selected?.studyGoalId || "";
     saveTodayData();
   }
 }
@@ -1128,6 +1234,26 @@ function updateCurrentGoalOptions() {
     todayData.currentStudyGoalId = "";
     saveTodayData();
   }
+}
+
+function refreshGoalSelectors() {
+  const activeGoals = studyGoals.filter((goal) => !goal.completed);
+  const preferredId = todayData.currentStudyGoalId || getPrimaryStudyGoal(activeGoals)?.id || "";
+  [homeQuickTaskGoalSelect, newTaskGoalSelect].forEach((select) => {
+    if (!select) return;
+    const previous = select.value;
+    select.replaceChildren();
+    if (activeGoals.length === 0) {
+      select.appendChild(new Option("先建立长期目标", ""));
+      select.disabled = true;
+      return;
+    }
+    select.disabled = false;
+    activeGoals.forEach((goal) => {
+      select.appendChild(new Option(`${goal.isPrimary ? "主目标 · " : ""}${goal.title}`, goal.id));
+    });
+    select.value = activeGoals.some((goal) => goal.id === previous) ? previous : preferredId;
+  });
 }
 
 function completeTaskWithAnimation(taskId) {
@@ -1153,7 +1279,7 @@ function hideTaskToast() {
 }
 
 function handleAddTask() {
-  const added = addTask(newTaskInput.value);
+  const added = addTask(newTaskInput.value, newTaskGoalSelect?.value);
 
   if (!added) {
     newTaskInput.focus();
@@ -1168,7 +1294,7 @@ function handleHomeQuickTask() {
   const title = homeQuickTaskInput?.value.trim() || "";
   const result = addHomeTask({
     title,
-    addTask,
+    addTask: (taskTitle) => addTask(taskTitle, homeQuickTaskGoalSelect?.value),
   });
 
   if (!result.added) {
@@ -1191,8 +1317,12 @@ function updateCurrentTaskSelection() {
 
 function updateCurrentGoalSelection(goalId) {
   const goal = studyGoals.find((item) => item.id === goalId);
-
-  todayData.currentStudyGoalId = goal ? goal.id : "";
+  if (!goal) return;
+  if (todayData.currentTaskId) {
+    taskController.assignGoal(todayData.currentTaskId, goal.id);
+    return;
+  }
+  todayData.currentStudyGoalId = goal.id;
   saveTodayData();
   runCloudSync(syncSettingsToCloud);
 }
@@ -1399,6 +1529,7 @@ function ensureCurrentTaskSelection() {
 
   todayData.currentTaskId = selection.task?.id || "";
   todayData.currentTask = selection.task?.title || "";
+  todayData.currentStudyGoalId = selection.task?.studyGoalId || "";
   saveTodayData();
 }
 
@@ -1420,6 +1551,7 @@ function renderHomePage() {
     },
     tasks,
     todayData,
+    studyGoals,
     formatPlanDate,
     messageIndex: homePetMessageIndex
   });
@@ -1428,6 +1560,8 @@ function renderHomePage() {
 function renderTimerAndProgress() {
   const timerState = timerEngine.getState();
   const totalSeconds = MODES[timerState.mode].minutes * 60;
+  const currentTask = getTodayTasks().find((task) => task.id === todayData.currentTaskId);
+  const currentGoalTitle = studyGoals.find((goal) => goal.id === currentTask?.studyGoalId)?.title || "";
   timerPanelView.render({
     mode: timerState.mode,
     remainingSeconds: timerState.remainingSeconds,
@@ -1443,6 +1577,7 @@ function renderTimerAndProgress() {
     totalSeconds,
     running: timerState.running,
     taskTitle: todayData.currentTask,
+    goalTitle: currentGoalTitle,
     progress: todayData.petProgress,
     selectedPet: todayData.selectedPet,
   });
@@ -1457,7 +1592,12 @@ function getStartableFocusTask() {
     return null;
   }
 
-  return getTodayTasks().find((task) => task.id === todayData.currentTaskId && !task.completed) || null;
+  return getTodayTasks().find((task) => (
+    task.id === todayData.currentTaskId
+    && !task.completed
+    && task.studyGoalId
+    && studyGoals.some((goal) => goal.id === task.studyGoalId && !goal.completed)
+  )) || null;
 }
 
 function ensureStartableFocusTask() {
@@ -1467,6 +1607,15 @@ function ensureStartableFocusTask() {
     todayData.currentTask = selectedTask.title;
     saveTodayData();
     return selectedTask;
+  }
+
+  const selectedWithoutGoal = getTodayTasks().find((task) => (
+    task.id === todayData.currentTaskId && !task.completed && !task.studyGoalId
+  ));
+  if (selectedWithoutGoal) {
+    document.querySelector(".focus-round-settings")?.setAttribute("open", "");
+    showTaskToast("先在“设置本轮”里选择这个任务所属的长期目标。");
+    return null;
   }
 
   const nextTask = sortExecutableTasks(
@@ -1484,10 +1633,16 @@ function ensureStartableFocusTask() {
 
   todayData.currentTaskId = nextTask.id;
   todayData.currentTask = nextTask.title;
+  todayData.currentStudyGoalId = nextTask.studyGoalId || "";
   saveTodayData();
   updateCurrentTaskOptions();
   renderHomePage();
   renderTaskPage();
+  if (!nextTask.studyGoalId || !studyGoals.some((goal) => goal.id === nextTask.studyGoalId && !goal.completed)) {
+    document.querySelector(".focus-round-settings")?.setAttribute("open", "");
+    showTaskToast("先给当前任务选择一个长期目标。");
+    return null;
+  }
   return nextTask;
 }
 
@@ -1506,7 +1661,11 @@ function renderGoalProgress() {
 }
 
 function renderRecords() {
-  renderRecordsView(recordsList, todayData.records);
+  renderRecordsView(
+    recordsList,
+    todayData.records,
+    (goalId) => studyGoals.find((goal) => goal.id === goalId)?.title || "",
+  );
 }
 
 function renderReviewPage() {

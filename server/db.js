@@ -36,6 +36,7 @@ db.exec(`
     next_rest_type TEXT NOT NULL DEFAULT 'short',
     current_task_id TEXT,
     current_study_goal_id TEXT,
+    long_goal_onboarding_completed INTEGER NOT NULL DEFAULT 0,
     updated_at TEXT NOT NULL
   );
 
@@ -66,6 +67,7 @@ db.exec(`
     suggested_for_date TEXT,
     ai_generated_at TEXT,
     xp_earned INTEGER NOT NULL DEFAULT 0,
+    study_goal_id TEXT REFERENCES study_goals(id) ON DELETE SET NULL,
     updated_at TEXT NOT NULL
   );
 
@@ -77,6 +79,9 @@ db.exec(`
     client_id TEXT,
     title TEXT NOT NULL,
     target_minutes INTEGER NOT NULL DEFAULT 0,
+    description TEXT NOT NULL DEFAULT '',
+    weekly_target_minutes INTEGER NOT NULL DEFAULT 0,
+    is_primary INTEGER NOT NULL DEFAULT 0,
     target_date TEXT,
     completed INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
@@ -126,6 +131,17 @@ if (!userSettingsColumns.includes("current_study_goal_id")) {
   db.exec("ALTER TABLE user_settings ADD COLUMN current_study_goal_id TEXT");
 }
 
+if (!userSettingsColumns.includes("long_goal_onboarding_completed")) {
+  db.exec("ALTER TABLE user_settings ADD COLUMN long_goal_onboarding_completed INTEGER NOT NULL DEFAULT 0");
+  db.exec(`
+    UPDATE user_settings
+    SET long_goal_onboarding_completed = 1
+    WHERE EXISTS (
+      SELECT 1 FROM study_goals WHERE study_goals.user_id = user_settings.user_id
+    )
+  `);
+}
+
 if (!taskColumns.includes("client_id")) {
   db.exec("ALTER TABLE tasks ADD COLUMN client_id TEXT");
 }
@@ -154,6 +170,10 @@ if (!taskColumns.includes("xp_earned")) {
   db.exec("ALTER TABLE tasks ADD COLUMN xp_earned INTEGER NOT NULL DEFAULT 0");
 }
 
+if (!taskColumns.includes("study_goal_id")) {
+  db.exec("ALTER TABLE tasks ADD COLUMN study_goal_id TEXT REFERENCES study_goals(id) ON DELETE SET NULL");
+}
+
 if (!focusSessionColumns.includes("client_id")) {
   db.exec("ALTER TABLE focus_sessions ADD COLUMN client_id TEXT");
 }
@@ -173,6 +193,47 @@ if (!studyGoalColumns.includes("client_id")) {
   db.exec("ALTER TABLE study_goals ADD COLUMN client_id TEXT");
 }
 
+if (!studyGoalColumns.includes("description")) {
+  db.exec("ALTER TABLE study_goals ADD COLUMN description TEXT NOT NULL DEFAULT ''");
+}
+
+if (!studyGoalColumns.includes("weekly_target_minutes")) {
+  db.exec("ALTER TABLE study_goals ADD COLUMN weekly_target_minutes INTEGER NOT NULL DEFAULT 0");
+}
+
+if (!studyGoalColumns.includes("is_primary")) {
+  db.exec("ALTER TABLE study_goals ADD COLUMN is_primary INTEGER NOT NULL DEFAULT 0");
+  db.exec(`
+    UPDATE study_goals
+    SET is_primary = 1
+    WHERE id IN (
+      SELECT candidate.id
+      FROM study_goals AS candidate
+      WHERE candidate.completed = 0
+        AND candidate.id = (
+          SELECT latest.id
+          FROM study_goals AS latest
+          WHERE latest.user_id = candidate.user_id AND latest.completed = 0
+          ORDER BY latest.updated_at DESC, latest.created_at DESC, latest.id DESC
+          LIMIT 1
+        )
+    )
+  `);
+}
+
+db.exec(`
+  UPDATE study_goals AS goal
+  SET is_primary = 0
+  WHERE goal.is_primary = 1
+    AND goal.id <> (
+      SELECT preferred.id
+      FROM study_goals AS preferred
+      WHERE preferred.user_id = goal.user_id AND preferred.is_primary = 1
+      ORDER BY preferred.updated_at DESC, preferred.id DESC
+      LIMIT 1
+    );
+`);
+
 db.exec(`
   CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_user_client
   ON tasks(user_id, client_id)
@@ -185,6 +246,10 @@ db.exec(`
   CREATE UNIQUE INDEX IF NOT EXISTS idx_study_goals_user_client
   ON study_goals(user_id, client_id)
   WHERE client_id IS NOT NULL;
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_study_goals_user_primary
+  ON study_goals(user_id)
+  WHERE is_primary = 1;
 
   CREATE INDEX IF NOT EXISTS idx_focus_sessions_user_date
   ON focus_sessions(user_id, date_key);
@@ -247,6 +312,7 @@ export function taskFromRow(row) {
     sourceDateKey: row.source_date_key || "",
     suggestedForDate: row.suggested_for_date || "",
     aiGeneratedAt: row.ai_generated_at || "",
+    studyGoalId: row.study_goal_id || "",
     xpEarned: Number(row.xp_earned) || 0,
     updatedAt: row.updated_at
   };
@@ -260,10 +326,14 @@ export function goalFromRow(row) {
     id: row.id,
     clientId: row.client_id,
     title: row.title,
+    description: row.description || "",
     targetMinutes,
+    weeklyTargetMinutes: Number(row.weekly_target_minutes) || 0,
+    recentFocusMinutes: Number(row.recent_focus_minutes) || 0,
     focusMinutes,
     progressPercent: targetMinutes > 0 ? Math.min(100, Math.round((focusMinutes / targetMinutes) * 100)) : 0,
     targetDate: row.target_date,
+    isPrimary: toBoolean(row.is_primary),
     completed: toBoolean(row.completed),
     createdAt: row.created_at,
     completedAt: row.completed_at,
@@ -279,6 +349,7 @@ export function settingsFromRow(row) {
     nextRestType: row.next_rest_type,
     currentTaskId: row.current_task_id,
     currentStudyGoalId: row.current_study_goal_id,
+    longGoalOnboardingCompleted: toBoolean(row.long_goal_onboarding_completed),
     updatedAt: row.updated_at
   };
 }

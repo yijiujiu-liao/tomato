@@ -72,6 +72,7 @@ export function createStudySyncController({
       const normalized = normalizeStudyGoal(created.studyGoal);
       replaceStudyGoal(previousId, normalized);
       remapFocusRecordReference("studyGoalId", previousId, normalized?.id);
+      remapTaskGoalReference(previousId, normalized?.id);
     }
   }
 
@@ -97,6 +98,7 @@ export function createStudySyncController({
       nextRestType: data.nextRestType,
       currentTaskId: data.currentTaskId,
       currentStudyGoalId: data.currentStudyGoalId,
+      longGoalOnboardingCompleted: Boolean(data.longGoalOnboardingCompleted),
     });
   }
 
@@ -155,6 +157,7 @@ export function createStudySyncController({
       sourceDateKey: cloudTask.sourceDateKey || localTask.sourceDateKey,
       suggestedForDate: cloudTask.suggestedForDate || localTask.suggestedForDate,
       aiGeneratedAt: cloudTask.aiGeneratedAt || localTask.aiGeneratedAt,
+      studyGoalId: cloudTask.studyGoalId || localTask.studyGoalId,
     });
     if (!normalized) return null;
     Object.assign(localTask, normalized);
@@ -182,6 +185,16 @@ export function createStudySyncController({
     }
 
     saveToday(false);
+  }
+
+  function remapTaskGoalReference(previousId, nextId) {
+    if (!previousId || !nextId || previousId === nextId) return;
+    for (const tasks of Object.values(taskStore.getPlans())) {
+      for (const task of tasks) {
+        if (task.studyGoalId === previousId) task.studyGoalId = nextId;
+      }
+    }
+    savePlans();
   }
 
   async function patchTask(task, patch, dateKey = getTodayKey()) {

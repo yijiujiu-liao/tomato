@@ -190,7 +190,10 @@ test("core study management API supports auth, sync, stats, and idempotent offli
     body: {
       clientId: goalClientId,
       title: "英语真题二刷",
+      description: "在九月前完成二刷并整理错题",
       targetMinutes: 3600,
+      weeklyTargetMinutes: 600,
+      isPrimary: true,
       targetDate: "2026-09-01"
     }
   });
@@ -211,7 +214,17 @@ test("core study management API supports auth, sync, stats, and idempotent offli
   });
 
   assert.equal(firstGoal.studyGoal.id, duplicateGoal.studyGoal.id);
+  assert.equal(firstGoal.studyGoal.description, "在九月前完成二刷并整理错题");
+  assert.equal(firstGoal.studyGoal.weeklyTargetMinutes, 600);
+  assert.equal(firstGoal.studyGoal.isPrimary, true);
   assert.equal(completedGoal.studyGoal.completed, true);
+
+  const linkedTask = await request(baseUrl, `/api/tasks/${firstTask.task.id}`, {
+    method: "PATCH",
+    token,
+    body: { studyGoalId: firstGoal.studyGoal.id },
+  });
+  assert.equal(linkedTask.task.studyGoalId, firstGoal.studyGoal.id);
 
   const focusClientId = `focus-${stamp}`;
   const endedAt = new Date().toISOString();
@@ -305,7 +318,8 @@ test("core study management API supports auth, sync, stats, and idempotent offli
       theme: "dark",
       nextRestType: "long",
       currentTaskId: firstTask.task.id,
-      currentStudyGoalId: firstGoal.studyGoal.id
+      currentStudyGoalId: firstGoal.studyGoal.id,
+      longGoalOnboardingCompleted: true
     }
   });
   const initialPet = await request(baseUrl, "/api/pet", { token });
@@ -359,6 +373,7 @@ test("core study management API supports auth, sync, stats, and idempotent offli
   assert.equal(stats.summary.averageActiveDayMinutes, 40);
   assert.equal(stats.summary.currentStreakDays, 2);
   assert.equal(stats.summary.bestDay.focusMinutes, 50);
+  assert.equal(stats.goalBreakdown.some((goal) => goal.id === firstGoal.studyGoal.id), true);
 
   const monthStats = await request(baseUrl, "/api/stats?range=month", { token });
   assert.equal(monthStats.days.length, 30);
@@ -405,7 +420,7 @@ test("core study management API supports auth, sync, stats, and idempotent offli
   );
 
   const restoredSummary = await request(baseUrl, `/api/ai/daily-summary?dateKey=${todayDateKey}`, { token });
-  assert.equal(restoredSummary.summary.tomorrowPlan[0], "优先整理数学错题");
+  assert.equal(restoredSummary.summary.tomorrowPlan[0].title, "优先整理数学错题");
   assert.equal(restoredSummary.summary.diagnosis.nextAction, "优先整理数学错题");
 
   const cachedSummary = await request(baseUrl, "/api/ai/daily-summary", {
@@ -430,8 +445,10 @@ test("core study management API supports auth, sync, stats, and idempotent offli
   assert.equal(sync.settings.focusDuration, 45);
   assert.equal(sync.settings.dailyGoal, 6);
   assert.equal(sync.settings.currentStudyGoalId, firstGoal.studyGoal.id);
+  assert.equal(sync.settings.longGoalOnboardingCompleted, true);
   assert.equal(sync.pet.petId, "greenDino");
   assert.equal(sync.tasks.filter((task) => task.clientId === taskClientId).length, 1);
+  assert.equal(sync.tasks.find((task) => task.clientId === taskClientId).studyGoalId, firstGoal.studyGoal.id);
   const syncedGoal = sync.studyGoals.find((goal) => goal.clientId === goalClientId);
   assert.equal(Boolean(syncedGoal), true);
   assert.equal(syncedGoal.focusMinutes, 80);

@@ -15,6 +15,7 @@ export function createAiPlanController({
   uploadTasks,
   createTask,
   applyCreatedTask,
+  getStudyGoals = () => [],
 }) {
   function adoptAiSuggestions() {
     const aiState = getAiState();
@@ -25,10 +26,20 @@ export function createAiPlanController({
     }
 
     const tomorrowKey = getTomorrowKey();
+    const activeGoals = getStudyGoals().filter((goal) => !goal.completed);
+    const primaryGoal = activeGoals.find((goal) => goal.isPrimary) || activeGoals[0] || null;
+    if (!primaryGoal) {
+      showToast("请先建立一个长期目标，再采纳 AI 明日建议。");
+      return 0;
+    }
     let addedCount = 0;
     for (const suggestion of suggestions) {
-      const task = addTaskToDate(tomorrowKey, suggestion, {
+      const matchedGoal = activeGoals.find((goal) => goal.id === suggestion.studyGoalId)
+        || activeGoals.find((goal) => goal.title === suggestion.goalTitle)
+        || primaryGoal;
+      const task = addTaskToDate(tomorrowKey, suggestion.title, {
         source: "ai",
+        studyGoalId: matchedGoal.id,
         sourceDateKey: getTodayKey(),
         sourceLabel: "AI 明日建议",
         aiGeneratedAt: aiState.generatedAt || new Date().toISOString(),
@@ -58,12 +69,19 @@ export function createAiPlanController({
       showToast("暂无可采纳的明日任务，先完成一轮专注再复盘。");
       return null;
     }
+    const activeGoals = getStudyGoals().filter((goal) => !goal.completed);
+    const fallbackGoal = activeGoals.find((goal) => goal.isPrimary) || activeGoals[0] || null;
+    if (!suggestion.studyGoalId && !fallbackGoal) {
+      showToast("请先建立长期目标，再把任务承接到明天。");
+      return null;
+    }
 
     const tomorrowKey = getTomorrowKey();
     const tomorrowTask = addTaskToDate(tomorrowKey, suggestion.title, {
       source: "review",
       sourceDateKey: getTodayKey(),
       sourceLabel: "复盘建议",
+      studyGoalId: suggestion.studyGoalId || fallbackGoal.id,
       carriedFromId: suggestion.id,
     });
     if (!tomorrowTask) {

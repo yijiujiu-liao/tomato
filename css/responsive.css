@@ -51,6 +51,10 @@
     grid-template-columns: 1fr;
   }
 
+  .study-goal-inline-edit {
+    grid-template-columns: 1fr;
+  }
+
   .stats-range-tabs {
     justify-content: space-between;
     width: 100%;

@@ -16,6 +16,7 @@ test("task controller keeps task, selection, pet reward, restore, and delay in o
   const data = {
     currentTaskId: "",
     currentTask: "",
+    currentStudyGoalId: "",
     selectedPet: "penguin",
     petProgress: createPetProgress("penguin"),
     todayPetXP: 0,
@@ -49,9 +50,11 @@ test("task controller keeps task, selection, pet reward, restore, and delay in o
     confirmDelete: () => true,
   });
 
-  assert.equal(controller.add("数学真题"), true);
+  assert.equal(controller.add("数学真题", "goal-math"), true);
   const taskId = data.currentTaskId;
   assert.equal(store.getTasks("2026-07-12")[0].title, "数学真题");
+  assert.equal(store.getTasks("2026-07-12")[0].studyGoalId, "goal-math");
+  assert.equal(data.currentStudyGoalId, "goal-math");
   const completion = controller.complete(taskId);
   assert.equal(completion.task.completed, true);
   assert.ok(data.petProgress.totalXP > 0);
@@ -70,6 +73,7 @@ test("task controller keeps task, selection, pet reward, restore, and delay in o
   assert.equal(delayed.delayedTask.carriedFromId, taskId);
   assert.equal(store.getTasks("2026-07-12").length, 0);
   assert.equal(store.getTasks("2026-07-13").length, 1);
+  assert.equal(delayed.delayedTask.studyGoalId, "goal-math");
 });
 
 test("completing an AI-carried task explains the feedback loop", () => {
