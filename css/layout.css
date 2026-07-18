@@ -538,71 +538,147 @@ body.dark .ai-plan-banner {
     linear-gradient(135deg, rgba(25, 40, 37, 0.92), rgba(22, 48, 42, 0.82));
 }
 
-.home-pet-status-card {
+.timer-pet-companion {
+  position: relative;
   display: grid;
-  gap: 12px;
-  padding: 16px;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 116px;
+  margin: 10px 0 12px;
+  padding: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(37, 99, 90, 0.14);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 12% 12%, rgba(255, 255, 255, 0.86), transparent 28%),
+    linear-gradient(145deg, rgba(218, 240, 232, 0.84), rgba(255, 244, 222, 0.82));
 }
 
-.home-pet-status-head {
+body.dark .timer-pet-companion {
+  background:
+    radial-gradient(circle at 12% 12%, rgba(255, 255, 255, 0.08), transparent 30%),
+    linear-gradient(145deg, rgba(34, 66, 58, 0.88), rgba(56, 47, 34, 0.76));
+}
+
+.timer-pet-stage {
+  position: relative;
+  display: grid;
+  place-items: end center;
+  width: 96px;
+  min-height: 96px;
+}
+
+.timer-pet-stage::before {
+  content: "";
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 5px;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(37, 99, 90, 0.14);
+  filter: blur(7px);
+}
+
+.timer-pet-stage::after {
+  content: "♥";
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  color: var(--accent);
+  font-size: 13px;
+  opacity: 0;
+  animation: petCompanionHeart 8s ease-in-out infinite;
+}
+
+.timer-pet-stage .home-pet-art {
+  position: relative;
+  z-index: 1;
+  width: 88px;
+  height: 88px;
+  transform-origin: 50% 90%;
+}
+
+.timer-pet-companion[data-activity="breathe"] .home-pet-art {
+  animation: petCompanionBreathe 3.2s ease-in-out infinite;
+}
+
+.timer-pet-companion[data-activity="peek"] .home-pet-art {
+  animation: petCompanionPeek 4.6s ease-in-out infinite;
+}
+
+.timer-pet-companion[data-activity="hop"] .home-pet-art {
+  animation: petCompanionHop 2.8s ease-in-out infinite;
+}
+
+.timer-card[data-timer-state="running"] .timer-pet-stage .home-pet-art {
+  animation: petCompanionFocus 4s ease-in-out infinite;
+}
+
+.timer-pet-copy {
+  position: relative;
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid rgba(37, 99, 90, 0.1);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.52);
+}
+
+body.dark .timer-pet-copy {
+  background: rgba(18, 35, 32, 0.46);
+}
+
+.timer-pet-copy::before {
+  content: "";
+  position: absolute;
+  left: -7px;
+  top: 25px;
+  width: 12px;
+  height: 12px;
+  border-left: 1px solid rgba(37, 99, 90, 0.1);
+  border-bottom: 1px solid rgba(37, 99, 90, 0.1);
+  background: inherit;
+  transform: rotate(45deg);
+}
+
+.timer-pet-heading {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
 }
 
-.home-pet-status-head h2 {
-  margin: 0;
+.timer-pet-heading strong {
+  overflow: hidden;
   color: var(--ink);
-  font-size: 20px;
+  font-size: 14px;
   font-weight: 950;
-  letter-spacing: -0.03em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.home-pet-status-head > span {
-  padding: 7px 10px;
+.timer-pet-heading span {
+  flex: 0 0 auto;
+  padding: 4px 7px;
   border-radius: 999px;
   color: var(--brand);
   background: var(--soft);
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 950;
   white-space: nowrap;
 }
 
-.home-pet-status-body {
-  display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
-}
-
-.home-pet-art {
-  border-radius: 18px;
-  background:
-    radial-gradient(circle at 50% 24%, rgba(255, 255, 255, 0.74), transparent 30%),
-    linear-gradient(145deg, rgba(216, 239, 230, 0.9), rgba(255, 246, 226, 0.88));
-}
-
-.home-pet-copy {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.home-pet-copy strong {
-  color: var(--ink);
-  font-size: 15px;
-  font-weight: 950;
-  line-height: 1.35;
-}
-
-.home-pet-copy span,
-.home-pet-next {
+.timer-pet-message {
+  min-height: 34px;
   margin: 0;
-  color: var(--muted);
+  color: var(--ink);
   font-size: 12px;
-  font-weight: 850;
-  line-height: 1.55;
+  font-weight: 800;
+  line-height: 1.45;
+  text-wrap: pretty;
 }
 
 .home-pet-progress {
@@ -620,27 +696,92 @@ body.dark .ai-plan-banner {
   transition: width 0.3s ease;
 }
 
-.home-today-metrics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
-}
-
-.home-today-metrics span {
-  min-height: 42px;
-  display: grid;
-  place-items: center;
-  padding: 6px;
-  border-radius: 14px;
+.home-pet-next {
+  overflow: hidden;
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.42);
-  font-size: 11px;
-  font-weight: 850;
-  text-align: center;
+  font-size: 10px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.home-today-metrics strong {
-  color: var(--brand);
+@keyframes petCompanionBreathe {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+
+  50% {
+    transform: translateY(-2px) scale(1.025, 0.985);
+  }
+}
+
+@keyframes petCompanionPeek {
+  0%,
+  35%,
+  100% {
+    transform: translateX(0) rotate(0);
+  }
+
+  45% {
+    transform: translateX(-4px) rotate(-4deg);
+  }
+
+  58% {
+    transform: translateX(4px) rotate(4deg);
+  }
+}
+
+@keyframes petCompanionHop {
+  0%,
+  68%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+
+  74% {
+    transform: translateY(-8px) scale(0.98, 1.04);
+  }
+
+  82% {
+    transform: translateY(0) scale(1.04, 0.96);
+  }
+}
+
+@keyframes petCompanionFocus {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+
+  50% {
+    transform: translateY(-1px) scale(1.012);
+  }
+}
+
+@keyframes petCompanionHeart {
+  0%,
+  58%,
+  100% {
+    opacity: 0;
+    transform: translateY(5px) scale(0.7);
+  }
+
+  68% {
+    opacity: 0.9;
+  }
+
+  82% {
+    opacity: 0;
+    transform: translateY(-12px) scale(1.05);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timer-pet-stage .home-pet-art,
+  .timer-pet-stage::after {
+    animation: none !important;
+  }
 }
 
 body[data-page="home"] .plan-card {

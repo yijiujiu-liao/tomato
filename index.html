@@ -100,32 +100,6 @@
 
           <div id="todayTaskMount"></div>
 
-          <section class="card home-pet-status-card" aria-label="今日宠物成长状态">
-            <div class="home-pet-status-head">
-              <div>
-                <p class="page-kicker">Growth</p>
-                <h2 id="homePetChip">蓝莓企鹅 Lv.1</h2>
-              </div>
-              <span id="homeGoalProgress">0 / 8</span>
-            </div>
-            <div class="home-pet-status-body">
-              <div class="home-pet-art" id="homePetArt" aria-hidden="true"></div>
-              <div class="home-pet-copy">
-                <strong>宠物正在等你完成下一轮</strong>
-                <span>专注完成后 XP 会增长，连续番茄有额外奖励。</span>
-              </div>
-            </div>
-            <div class="home-pet-progress" aria-label="首页宠物经验进度">
-              <div id="homePetProgressFill"></div>
-            </div>
-            <p class="home-pet-next" id="homePetNextHint">完成一个完整番茄后获得 XP。</p>
-            <div class="home-today-metrics" aria-label="今日学习概览">
-              <span><strong id="homeTaskProgress">0 / 0</strong> 任务</span>
-              <span><strong id="homeFocusMinutes">0</strong> 分钟</span>
-              <span><strong id="homeStreakText">连续 0</strong></span>
-            </div>
-          </section>
-
         </div>
       </section>
 
@@ -219,6 +193,24 @@
             <div class="timer-progress-fill" id="timerProgressFill"></div>
           </div>
           <p class="progress-text" id="timerProgressText">本轮已完成 0%</p>
+
+          <section class="timer-pet-companion" id="homePetCompanion" data-activity="breathe" data-mood="ready" aria-label="当前宠物陪伴">
+            <div class="timer-pet-stage" aria-hidden="true">
+              <div class="home-pet-art" id="homePetArt"></div>
+            </div>
+            <div class="timer-pet-copy">
+              <div class="timer-pet-heading">
+                <strong id="homePetChip">蓝莓企鹅 Lv.1</strong>
+                <span id="homeGoalProgress">0 / 8 番茄</span>
+              </div>
+              <p class="timer-pet-message" id="homePetMessage">别着急，我陪你把这一轮稳稳完成。</p>
+              <div class="home-pet-progress" aria-label="当前宠物经验进度">
+                <div id="homePetProgressFill"></div>
+              </div>
+              <small class="home-pet-next" id="homePetNextHint">完成一个完整番茄后获得 XP。</small>
+            </div>
+          </section>
+
           <p class="status-text" id="statusText">准备开始今天的第一轮专注。</p>
 
           <div class="controls">

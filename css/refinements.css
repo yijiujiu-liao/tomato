@@ -196,47 +196,34 @@ body[data-page="home"] .plan-header h2 {
   font-weight: 750;
 }
 
-.home-pet-status-card {
-  position: relative;
-  display: grid;
-  gap: 7px;
-  min-height: 116px;
-  padding: 14px 14px 14px 82px;
+.today-stack .timer-pet-companion {
+  margin-block: 9px 10px;
 }
 
-.home-pet-status-body {
-  position: absolute;
-  top: 14px;
-  left: 14px;
-  display: block;
+.today-stack .timer-pet-copy {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.46);
 }
 
-.home-pet-art {
-  width: 54px;
-  height: 54px;
-  border-radius: 12px;
-}
+@media (max-width: 390px) {
+  .timer-pet-companion {
+    grid-template-columns: 82px minmax(0, 1fr);
+    padding: 8px;
+  }
 
-.home-pet-copy,
-.home-today-metrics {
-  display: none;
-}
+  .timer-pet-stage {
+    width: 82px;
+  }
 
-.home-pet-status-head h2 {
-  font-size: 16px;
-  font-weight: 800;
-}
+  .timer-pet-stage .home-pet-art {
+    width: 78px;
+    height: 78px;
+  }
 
-.home-pet-status-head > span {
-  padding: 5px 8px;
-  border-radius: 9px;
-  font-weight: 800;
-}
-
-.home-pet-next {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  .timer-pet-heading span {
+    max-width: 74px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
 
 .ai-plan-banner {

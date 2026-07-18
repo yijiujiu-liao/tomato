@@ -1,18 +1,58 @@
 import { createPetProgress, getEvolutionStage, getNextStageProgress, normalizePetType, renderPetImage } from "../pet.js";
 import { PET_TYPES } from "../state.js";
 
+const PET_COMPANION_MESSAGES = [
+  "别着急，我陪你把这一轮稳稳完成。",
+  "再专注一个番茄，我们都会更接近目标。",
+  "今天的努力没有消失，它正在变成我的成长。",
+  "肩膀放松，先做好眼前这一件事。",
+];
+
+const PET_IDLE_ACTIVITIES = ["breathe", "peek", "hop"];
+
 export function addHomeTask({ title, addTask }) {
   const cleanTitle = String(title || "").trim();
   return { added: Boolean(addTask(cleanTitle)) };
 }
 
-export function renderHomePage({ elements, tasks, todayData, formatPlanDate }) {
+export function getHomePetCompanionState({ tasks, todayData, messageIndex = 0 }) {
+  const unfinishedTasks = tasks.filter((task) => !task.completed);
+  const allTasksCompleted = tasks.length > 0 && unfinishedTasks.length === 0;
+  const goalReached = todayData.completedCount > 0
+    && todayData.completedCount >= todayData.dailyGoal;
+
+  if (tasks.length === 0) {
+    return {
+      activity: "peek",
+      mood: "waiting",
+      message: "先写下一件今天要做的事，我会在这里等你。",
+    };
+  }
+
+  if (allTasksCompleted || goalReached) {
+    return {
+      activity: "hop",
+      mood: "celebrate",
+      message: "今天已经很棒啦，记得把这份节奏带到明天。",
+    };
+  }
+
+  const safeIndex = Math.abs(Number(messageIndex) || 0);
+  return {
+    activity: PET_IDLE_ACTIVITIES[safeIndex % PET_IDLE_ACTIVITIES.length],
+    mood: todayData.completedCount > 0 ? "happy" : "ready",
+    message: PET_COMPANION_MESSAGES[safeIndex % PET_COMPANION_MESSAGES.length],
+  };
+}
+
+export function renderHomePage({ elements, tasks, todayData, formatPlanDate, messageIndex = 0 }) {
   document.body.classList.toggle("has-no-tasks", tasks.length === 0);
   const progress = todayData.petProgress || createPetProgress(todayData.selectedPet);
   const petId = normalizePetType(progress.petId || todayData.selectedPet);
   const petType = PET_TYPES[petId];
   const stage = getEvolutionStage(progress.level);
   const xpPercent = Math.min(100, Math.round((progress.currentXP / progress.nextLevelXP) * 100));
+  const companionState = getHomePetCompanionState({ tasks, todayData, messageIndex });
 
   renderHomePageView({
     elements,
@@ -23,12 +63,17 @@ export function renderHomePage({ elements, tasks, todayData, formatPlanDate }) {
     formatPlanDate,
   });
   renderAiPlanBanner(elements, tasks);
+  if (elements.homePetCompanion) {
+    elements.homePetCompanion.dataset.activity = companionState.activity;
+    elements.homePetCompanion.dataset.mood = companionState.mood;
+  }
+  if (elements.homePetMessage) elements.homePetMessage.textContent = companionState.message;
   if (elements.homePetArt) elements.homePetArt.innerHTML = renderPetImage(petId, stage.id, "choice");
   if (elements.homePetProgressFill) elements.homePetProgressFill.style.width = `${xpPercent}%`;
   if (elements.homePetNextHint) {
     const nextStage = getNextStageProgress(progress, todayData.focusDuration);
     elements.homePetNextHint.textContent = nextStage
-      ? `距离下一阶段还差 ${nextStage.xp} XP，约 ${nextStage.tomatoes} 个番茄。`
+      ? `再完成约 ${nextStage.tomatoes} 个番茄，解锁下一阶段`
       : "已经是完全体，继续积累长期成长。";
   }
 }
@@ -69,20 +114,18 @@ export function renderHomePageView({
   petLevel,
   formatPlanDate
 }) {
-  if (!elements.homeTaskProgress) {
+  if (!elements.homeDateText) {
     return;
   }
 
-  const completedTasks = tasks.filter((task) => task.completed);
   const nextTask = tasks.find((task) => !task.completed);
   const selectedTask = tasks.find((task) => task.id === todayData.currentTaskId && !task.completed);
 
   elements.homeDateText.textContent = formatPlanDate(new Date());
-  elements.homeTaskProgress.textContent = `${completedTasks.length} / ${tasks.length}`;
-  elements.homeFocusMinutes.textContent = String(todayData.focusMinutes || 0);
-  elements.homeGoalProgress.textContent = `${todayData.completedCount} / ${todayData.dailyGoal}`;
-  elements.homeStreakText.textContent = `连续 ${todayData.streak || 0}`;
-  elements.homePetChip.textContent = `${petName} Lv.${petLevel}`;
+  if (elements.homeGoalProgress) {
+    elements.homeGoalProgress.textContent = `${todayData.completedCount} / ${todayData.dailyGoal} 番茄`;
+  }
+  if (elements.homePetChip) elements.homePetChip.textContent = `${petName} Lv.${petLevel}`;
   elements.homeQuickTask.hidden = tasks.length > 0;
   if (elements.homeReviewBtn) {
     const reviewState = getHomeReviewState({

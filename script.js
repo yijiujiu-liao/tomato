@@ -101,12 +101,11 @@ const appPages = document.querySelectorAll(".app-page");
 const todayTaskMount = document.querySelector("#todayTaskMount");
 const todayTimerMount = document.querySelector("#todayTimerMount");
 const homeDateText = document.querySelector("#homeDateText");
-const homeTaskProgress = document.querySelector("#homeTaskProgress");
-const homeFocusMinutes = document.querySelector("#homeFocusMinutes");
 const homeGoalProgress = document.querySelector("#homeGoalProgress");
-const homeStreakText = document.querySelector("#homeStreakText");
+const homePetCompanion = document.querySelector("#homePetCompanion");
 const homePetChip = document.querySelector("#homePetChip");
 const homePetArt = document.querySelector("#homePetArt");
+const homePetMessage = document.querySelector("#homePetMessage");
 const homePetProgressFill = document.querySelector("#homePetProgressFill");
 const homePetNextHint = document.querySelector("#homePetNextHint");
 const homeNextTaskTitle = document.querySelector("#homeNextTaskTitle");
@@ -371,6 +370,7 @@ let focusFlowController = null;
 
 const todayStore = createTodayStore({ storage: localStorage, key: STORAGE_KEY, getDateKey });
 let todayData = todayStore.load();
+let homePetMessageIndex = 0;
 const cloudStatsController = createCloudStatsController({
   isEnabled: isCloudSyncEnabled,
   fetchStats: (range) => cloudRepository.fetchStats(range),
@@ -594,6 +594,11 @@ setupCurrentGoalUI();
 placeDataUtilitiesLast();
 refreshAuthUI();
 bootstrapCloudSession();
+window.setInterval(() => {
+  if (document.hidden || document.body.dataset.page !== "home") return;
+  homePetMessageIndex += 1;
+  renderHomePage();
+}, 9000);
 
 startBtn.addEventListener("click", startTimer);
 pauseBtn.addEventListener("click", pauseTimer);
@@ -1396,11 +1401,10 @@ function renderHomePage() {
   renderHomePageView({
     elements: {
       homeDateText,
-      homeTaskProgress,
-      homeFocusMinutes,
       homeGoalProgress,
-      homeStreakText,
+      homePetCompanion,
       homePetChip,
+      homePetMessage,
       homeNextTaskTitle,
       homeNextTaskHint,
       homeQuickTask,
@@ -1414,7 +1418,8 @@ function renderHomePage() {
     },
     tasks,
     todayData,
-    formatPlanDate
+    formatPlanDate,
+    messageIndex: homePetMessageIndex
   });
 }
 
@@ -1552,6 +1557,7 @@ function selectPetType(typeKey) {
   const selected = petController.select(typeKey);
   renderPetPicker();
   updatePetUI();
+  renderHomePage();
   statusText.textContent = `已切换为 ${selected.name}，从 Lv.1 开始培养。`;
 }
 
