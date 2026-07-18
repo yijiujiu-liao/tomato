@@ -121,6 +121,7 @@ const homeAddTaskBtn = document.querySelector("#homeAddTaskBtn");
 const homeInsightsBtn = document.querySelector("#homeInsightsBtn");
 const focusDurationInput = document.querySelector("#focusDurationInput");
 const restDurationSelect = document.querySelector("#restDurationSelect");
+const roundSettingsSummary = document.querySelector("#roundSettingsSummary");
 const currentTaskSelect = document.querySelector("#currentTaskSelect");
 const todayDateText = document.querySelector("#todayDateText");
 const planProgressText = document.querySelector("#planProgressText");
@@ -1562,6 +1563,9 @@ function renderTimerAndProgress() {
   const totalSeconds = MODES[timerState.mode].minutes * 60;
   const currentTask = getTodayTasks().find((task) => task.id === todayData.currentTaskId);
   const currentGoalTitle = studyGoals.find((goal) => goal.id === currentTask?.studyGoalId)?.title || "";
+  if (roundSettingsSummary) {
+    roundSettingsSummary.textContent = `${todayData.focusDuration} 分钟 · 休息 ${getRestMinutes()} 分钟`;
+  }
   timerPanelView.render({
     mode: timerState.mode,
     remainingSeconds: timerState.remainingSeconds,

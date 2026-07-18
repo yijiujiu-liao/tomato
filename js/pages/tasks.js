@@ -123,7 +123,7 @@ export function createTasksPageController({
     const existing = new Set(todayTasks.flatMap((task) => [task.carriedFromId, task.title].filter(Boolean)));
     const count = yesterdayTasks.filter((task) => !task.completed && !existing.has(task.id) && !existing.has(task.title)).length;
     elements.carryOverBanner.hidden = count === 0;
-    elements.carryOverText.textContent = `昨日有 ${count} 个未完成任务，是否带入今天？`;
+    elements.carryOverText.textContent = `昨天还有 ${count} 项未完成`;
   }
 
   function toggleExpansion() {
@@ -134,7 +134,9 @@ export function createTasksPageController({
   function renderExpansion() {
     document.body.classList.toggle("show-full-plan", expanded);
     if (elements.planExpandButton) {
-      elements.planExpandButton.textContent = expanded ? "收起为三件大事" : "展开完整计划";
+      elements.planExpandButton.textContent = expanded ? "收起" : "管理";
+      elements.planExpandButton.setAttribute("aria-expanded", String(expanded));
+      elements.planExpandButton.title = expanded ? "收起任务管理" : "添加、带入或查看全部任务";
     }
   }
 
@@ -171,7 +173,7 @@ export function renderTasksPageView({
   const completedTasks = tasks.filter((task) => task.completed);
 
   elements.todayDateText.textContent = formatPlanDate(now);
-  elements.planProgressText.textContent = `已完成 ${completedCount} / ${tasks.length}`;
+  elements.planProgressText.textContent = `${completedCount} / ${tasks.length}`;
   elements.taskList.innerHTML = "";
 
   if (tasks.length === 0) {
@@ -182,7 +184,7 @@ export function renderTasksPageView({
     return;
   }
 
-  appendTaskGroup(elements.taskList, "今日三件大事", "priority", priorityTasks, renderTaskCard);
+  appendTaskGroup(elements.taskList, "三件大事", "priority", priorityTasks, renderTaskCard);
   appendTaskGroup(elements.taskList, "其他任务", "other", otherTasks, renderTaskCard);
   appendTaskGroup(elements.taskList, "已完成任务", "completed", completedTasks, renderTaskCard);
 }
