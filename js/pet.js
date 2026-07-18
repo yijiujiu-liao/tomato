@@ -178,8 +178,8 @@ export function renderPetActivity(typeKey, evolutionStageId) {
     <span
       class="pet-activity-sprite"
       role="img"
-      aria-label="${pet.name}正在活动"
-      style="--pet-activity-image: url('${pet.activitySrc}'); --pet-stage-position: ${stagePosition}%;"
+      aria-label="${pet.name}正在向右走"
+      style="--pet-activity-image: url('${pet.walkSrc}'); --pet-stage-position: ${stagePosition}%;"
     ></span>
   `;
 }

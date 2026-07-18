@@ -34,25 +34,25 @@ export const PET_TYPES = {
   penguin: {
     name: "蓝莓企鹅",
     src: "assets/pets/penguin-v2.png",
-    activitySrc: "/assets/pets/penguin-activity.png",
+    walkSrc: "/assets/pets/penguin-walk.png",
     accent: "#9fc7ea"
   },
   purpleDragon: {
     name: "紫晶小龙",
     src: "assets/pets/purple-dragon-v2.png",
-    activitySrc: "/assets/pets/purple-dragon-activity.png",
+    walkSrc: "/assets/pets/purple-dragon-walk.png",
     accent: "#9b6ee8"
   },
   greenDino: {
     name: "青叶恐龙",
     src: "assets/pets/green-dino-v2.png",
-    activitySrc: "/assets/pets/green-dino-activity.png",
+    walkSrc: "/assets/pets/green-dino-walk.png",
     accent: "#94bd55"
   },
   chick: {
     name: "奶油小鸡",
     src: "assets/pets/chick-v2.png",
-    activitySrc: "/assets/pets/chick-activity.png",
+    walkSrc: "/assets/pets/chick-walk.png",
     accent: "#f3c34a"
   }
 };

@@ -87,10 +87,10 @@ test("pet activity renderer selects the animated atlas and evolution row", () =>
   const juvenile = renderPetActivity("purpleDragon", 1);
   const evolved = renderPetActivity("purpleDragon", 3);
 
-  assert.match(juvenile, /purple-dragon-activity\.png/);
+  assert.match(juvenile, /purple-dragon-walk\.png/);
   assert.match(juvenile, /--pet-stage-position: 0%/);
   assert.match(evolved, /--pet-stage-position: 66\.666/);
-  assert.match(evolved, /紫晶小龙正在活动/);
+  assert.match(evolved, /紫晶小龙正在向右走/);
 });
 
 test("auth and daily-plan storage retain the existing serialized contract", () => {

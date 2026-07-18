@@ -208,17 +208,17 @@ body[data-page="home"] .plan-header h2 {
   .timer-pet-roamer,
   .timer-pet-sprite-host,
   .pet-activity-sprite {
-    width: 116px;
-    height: 116px;
+    width: 148px;
+    height: 148px;
   }
 
   .timer-pet-roamer {
-    bottom: 15px;
-    left: 10px;
+    bottom: 9px;
+    left: 50%;
   }
 
   .timer-pet-speech {
-    top: 34px;
+    top: 9px;
     right: 9px;
     width: min(196px, 60%);
     padding: 9px 10px;

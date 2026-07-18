@@ -545,7 +545,7 @@ body.dark .ai-plan-banner {
   border: 1px solid rgba(37, 99, 90, 0.14);
 }
 
-/* A calm companion scene with occasional finite actions. */
+/* A focused walking scene: the pet stays centered while the world moves past. */
 .timer-pet-companion {
   display: block;
   min-height: 190px;
@@ -712,7 +712,7 @@ body.dark .pet-presence {
 .timer-pet-speech {
   position: absolute;
   z-index: 4;
-  top: 34px;
+  top: 9px;
   right: 16px;
   width: min(218px, 58%);
   padding: 10px 12px;
@@ -768,9 +768,10 @@ body.dark .timer-pet-speech {
   position: absolute;
   z-index: 3;
   bottom: 17px;
-  left: 19px;
-  width: 132px;
-  height: 132px;
+  left: 50%;
+  width: 156px;
+  height: 156px;
+  transform: translateX(-50%);
   transform-origin: 50% 100%;
 }
 
@@ -789,70 +790,42 @@ body.dark .timer-pet-speech {
 .timer-pet-sprite-host {
   position: relative;
   z-index: 1;
-  width: 132px;
-  height: 132px;
+  width: 156px;
+  height: 156px;
 }
 
 .pet-activity-sprite {
   display: block;
-  width: 132px;
-  height: 132px;
+  width: 156px;
+  height: 156px;
   background-image: var(--pet-activity-image);
   background-repeat: no-repeat;
   background-position-x: 0%;
   background-position-y: var(--pet-stage-position);
-  background-size: 1200% 400%;
+  background-size: 400% 400%;
   filter: drop-shadow(0 8px 9px rgba(33, 57, 50, 0.11));
   animation: none;
 }
 
 .timer-pet-companion[data-action="walk"] .pet-activity-sprite {
-  animation: petFramesWalk 3.6s steps(1, end) both;
+  animation: petFramesWalk 0.76s steps(1, end) infinite;
 }
 
-.timer-pet-companion[data-action="glance"] .pet-activity-sprite {
-  animation: petFramesGlance 1.6s steps(1, end) both;
-}
-
-.timer-pet-companion[data-action="stretch"] .pet-activity-sprite {
-  animation: petFramesStretch 1.9s steps(1, end) both;
-}
-
-.timer-pet-companion[data-action="hop"] .pet-activity-sprite {
-  animation: petFramesHop 1.75s steps(1, end) both;
-}
-
-.timer-pet-companion[data-action="celebrate"] .pet-activity-sprite {
-  animation: petFramesCelebrate 2.2s steps(1, end) both;
-}
-
-.timer-pet-companion[data-action="walk"] .timer-pet-roamer {
-  animation: petMotionWalk 3.6s linear both;
+.timer-pet-companion[data-action="walk"] .timer-pet-sprite-host {
+  animation: petWalkingBob 0.76s ease-in-out infinite;
 }
 
 .timer-pet-companion[data-action="walk"] .pet-ground-track {
-  animation: petGroundMoveLeft 3.6s linear both;
+  animation: petGroundMoveLeft 1.18s linear infinite;
 }
 
 .timer-pet-companion[data-action="walk"] .pet-playground-leaf,
 .timer-pet-companion[data-action="walk"] .pet-playground-toy {
-  animation: petSceneryMoveLeft 3.6s linear both;
+  animation: petSceneryMoveLeft 5.4s linear infinite;
 }
 
-.timer-pet-companion[data-action="glance"] .timer-pet-roamer {
-  animation: petMotionGlance 1.6s cubic-bezier(0.2, 0.72, 0.25, 1) both;
-}
-
-.timer-pet-companion[data-action="stretch"] .timer-pet-roamer {
-  animation: petMotionStretch 1.9s cubic-bezier(0.2, 0.72, 0.25, 1) both;
-}
-
-.timer-pet-companion[data-action="hop"] .timer-pet-roamer {
-  animation: petMotionHop 1.75s cubic-bezier(0.2, 0.72, 0.25, 1) both;
-}
-
-.timer-pet-companion[data-action="celebrate"] .timer-pet-roamer {
-  animation: petMotionCelebrate 2.2s cubic-bezier(0.2, 0.72, 0.25, 1) both;
+.timer-pet-companion[data-action="walk"] .pet-playground-toy {
+  animation-delay: -2.7s;
 }
 
 @keyframes petFramesWalk {
@@ -861,162 +834,28 @@ body.dark .timer-pet-speech {
     background-position-x: 0%;
   }
 
-  10%,
-  50% {
-    background-position-x: 18.1818%;
-  }
-
-  20%,
-  60% {
-    background-position-x: 27.2727%;
-  }
-
-  30%,
-  70% {
-    background-position-x: 9.0909%;
-  }
-
-  40%,
-  80% {
-    background-position-x: 36.3636%;
-  }
-}
-
-@keyframes petFramesGlance {
-  0%,
-  16%,
-  100% {
-    background-position-x: 0%;
-  }
-
-  30% {
-    background-position-x: 18.1818%;
-  }
-
-  48% {
-    background-position-x: 27.2727%;
-  }
-
-  68% {
-    background-position-x: 18.1818%;
-  }
-
-  84% {
-    background-position-x: 9.0909%;
-  }
-}
-
-@keyframes petFramesStretch {
-  0%,
-  100% {
-    background-position-x: 0%;
-  }
-
-  20%,
-  80% {
-    background-position-x: 9.0909%;
-  }
-
-  42% {
-    background-position-x: 36.3636%;
-  }
-
-  62% {
-    background-position-x: 27.2727%;
-  }
-}
-
-@keyframes petFramesHop {
-  0%,
-  100% {
-    background-position-x: 0%;
-  }
-
-  14% {
-    background-position-x: 36.3636%;
-  }
-
-  28% {
-    background-position-x: 45.4545%;
-  }
-
-  42% {
-    background-position-x: 54.5454%;
-  }
-
-  58% {
-    background-position-x: 63.6363%;
-  }
-
-  74% {
-    background-position-x: 72.7272%;
-  }
-
-  88% {
-    background-position-x: 81.8181%;
-  }
-}
-
-@keyframes petFramesCelebrate {
-  0%,
-  100% {
-    background-position-x: 0%;
-  }
-
-  12% {
-    background-position-x: 45.4545%;
-  }
-
   25% {
-    background-position-x: 54.5454%;
+    background-position-x: 33.3333%;
   }
 
-  40% {
-    background-position-x: 72.7272%;
+  50% {
+    background-position-x: 66.6667%;
   }
 
-  56% {
-    background-position-x: 90.9090%;
-  }
-
-  72% {
+  75% {
     background-position-x: 100%;
   }
-
-  88% {
-    background-position-x: 81.8181%;
-  }
 }
 
-@keyframes petMotionWalk {
-  0% {
-    opacity: 0;
-    transform: translateX(0);
-  }
-
-  7% {
-    opacity: 1;
-    transform: translateX(0);
-  }
-
-  84% {
-    opacity: 1;
-    transform: translateX(120%);
-  }
-
-  92% {
-    opacity: 0;
-    transform: translateX(126%);
-  }
-
-  93% {
-    opacity: 0;
-    transform: translateX(0);
-  }
-
+@keyframes petWalkingBob {
+  0%,
   100% {
-    opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0);
+  }
+
+  25%,
+  75% {
+    transform: translateY(-2px);
   }
 }
 
@@ -1032,92 +871,18 @@ body.dark .timer-pet-speech {
 
 @keyframes petSceneryMoveLeft {
   0% {
-    opacity: 1;
-    translate: 0 0;
-  }
-
-  82% {
-    opacity: 1;
-    translate: -92px 0;
-  }
-
-  91% {
     opacity: 0;
-    translate: -104px 0;
+    translate: 54px 0;
   }
 
-  92% {
-    opacity: 0;
-    translate: 0 0;
-  }
-
-  100% {
+  10%,
+  84% {
     opacity: 1;
-    translate: 0 0;
   }
-}
 
-@keyframes petMotionGlance {
-  0%,
   100% {
-    transform: translateX(0) rotate(0);
-  }
-
-  45% {
-    transform: translateX(9px) rotate(1.5deg);
-  }
-}
-
-@keyframes petMotionStretch {
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
-  }
-
-  42% {
-    transform: translateY(2px) scale(1.035, 0.97);
-  }
-
-  68% {
-    transform: translateY(-2px) scale(0.985, 1.025);
-  }
-}
-
-@keyframes petMotionHop {
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
-  }
-
-  22% {
-    transform: translateY(2px) scale(1.035, 0.965);
-  }
-
-  48% {
-    transform: translateX(10px) translateY(-16px) scale(0.985, 1.02);
-  }
-
-  72% {
-    transform: translateX(15px) translateY(0) scale(1.04, 0.96);
-  }
-}
-
-@keyframes petMotionCelebrate {
-  0%,
-  100% {
-    transform: translateY(0) rotate(0) scale(1);
-  }
-
-  25% {
-    transform: translateY(-9px) rotate(-3deg) scale(1.01);
-  }
-
-  48% {
-    transform: translateY(0) rotate(2deg) scale(1.03, 0.97);
-  }
-
-  69% {
-    transform: translateY(-12px) rotate(3deg) scale(0.99, 1.02);
+    opacity: 0;
+    translate: -330px 0;
   }
 }
 

@@ -2,35 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   createPetCompanionController,
-  getPetActionDelay,
-  pickPetAction,
-  shouldShowPetSpeech,
+  getPetSpeechDelay,
 } from "../js/components/petCompanion.js";
 
-test("pet companion chooses finite actions without an immediate repeat", () => {
-  const first = pickPetAction({ mood: "ready", random: () => 0 });
-  const second = pickPetAction({
-    mood: "ready",
-    previousAction: first.name,
-    random: () => 0,
-  });
-
-  assert.equal(first.name, "walk");
-  assert.equal(first.duration, 3600);
-  assert.notEqual(second.name, first.name);
+test("pet companion keeps encouragement calm and infrequent", () => {
+  assert.equal(getPetSpeechDelay(() => 0, true), 6500);
+  assert.equal(getPetSpeechDelay(() => 1, true), 10000);
+  assert.equal(getPetSpeechDelay(() => 0), 16000);
+  assert.equal(getPetSpeechDelay(() => 1), 28000);
 });
 
-test("pet companion keeps action delays calm and speech infrequent", () => {
-  assert.equal(getPetActionDelay(() => 0, true), 4200);
-  assert.equal(getPetActionDelay(() => 1, true), 7000);
-  assert.equal(getPetActionDelay(() => 0), 8500);
-  assert.equal(getPetActionDelay(() => 1), 15000);
-  assert.equal(shouldShowPetSpeech(1, () => 0), false);
-  assert.equal(shouldShowPetSpeech(2, () => 0), true);
-  assert.equal(shouldShowPetSpeech(3, () => 1), true);
-});
-
-test("pet companion returns to a still idle state after each action", () => {
+test("pet companion walks continuously and speaks on a quiet schedule", () => {
   const timers = [];
   const cleared = new Set();
   const element = { dataset: { mood: "ready" } };
@@ -48,19 +30,20 @@ test("pet companion returns to a still idle state after each action", () => {
   });
 
   controller.start();
-  assert.equal(element.dataset.action, "idle");
+  assert.equal(element.dataset.action, "walk");
   assert.equal(element.dataset.speaking, "false");
-  assert.equal(timers[0].delay, 4200);
+  assert.equal(timers[0].delay, 6500);
 
   timers[0].callback();
   assert.equal(element.dataset.action, "walk");
-  assert.equal(element.dataset.speaking, "false");
-  assert.equal(speechCount, 0);
+  assert.equal(element.dataset.speaking, "true");
+  assert.equal(speechCount, 1);
+  assert.ok(timers.some((timer) => timer.delay === 4600));
+  assert.ok(timers.some((timer) => timer.delay === 16000));
 
-  const actionTimer = timers.find((timer) => timer.delay === 3600);
-  actionTimer.callback();
-  assert.equal(element.dataset.action, "idle");
-  assert.ok(timers.some((timer) => timer.delay === 8500));
+  const speechTimer = timers.find((timer) => timer.delay === 4600);
+  speechTimer.callback();
+  assert.equal(element.dataset.speaking, "false");
 
   controller.stop();
   assert.equal(element.dataset.action, "idle");
