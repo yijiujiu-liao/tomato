@@ -200,29 +200,36 @@ body[data-page="home"] .plan-header h2 {
   margin-block: 9px 10px;
 }
 
-.today-stack .timer-pet-copy {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.46);
-}
-
 @media (max-width: 390px) {
   .timer-pet-companion {
-    grid-template-columns: 82px minmax(0, 1fr);
-    padding: 8px;
+    min-height: 184px;
   }
 
-  .timer-pet-stage {
-    width: 82px;
+  .timer-pet-roamer,
+  .timer-pet-sprite-host,
+  .pet-activity-sprite {
+    width: 108px;
+    height: 108px;
   }
 
-  .timer-pet-stage .home-pet-art {
-    width: 78px;
-    height: 78px;
+  .timer-pet-roamer {
+    bottom: 48px;
+    left: 8px;
   }
 
-  .timer-pet-heading span {
-    max-width: 74px;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .timer-pet-speech {
+    right: 10px;
+    width: min(205px, 62%);
+    padding: 8px 10px;
+  }
+
+  .timer-pet-speech p {
+    font-size: 11px;
+  }
+
+  .timer-pet-hud {
+    right: 7px;
+    left: 7px;
   }
 }
 

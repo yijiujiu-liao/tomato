@@ -5,7 +5,8 @@ import {
   createPetProgressFromTotalXP,
   getNextStageProgress,
   normalizePetProgress,
-  removePetExperience
+  removePetExperience,
+  renderPetActivity
 } from "../js/pet.js";
 import {
   loadAuthSession,
@@ -80,6 +81,16 @@ test("pet normalization repairs inconsistent legacy totals", () => {
   assert.equal(normalized.currentXP, 25);
   assert.equal(normalized.totalXP, 275);
   assert.deepEqual(getNextStageProgress(normalized, 50), { xp: 425, tomatoes: 9 });
+});
+
+test("pet activity renderer selects the animated atlas and evolution row", () => {
+  const juvenile = renderPetActivity("purpleDragon", 1);
+  const evolved = renderPetActivity("purpleDragon", 3);
+
+  assert.match(juvenile, /purple-dragon-activity\.png/);
+  assert.match(juvenile, /--pet-stage-position: 0%/);
+  assert.match(evolved, /--pet-stage-position: 66\.666/);
+  assert.match(evolved, /紫晶小龙正在活动/);
 });
 
 test("auth and daily-plan storage retain the existing serialized contract", () => {

@@ -56,6 +56,7 @@ test("home pet companion guides empty days and celebrates completed plans", () =
   }), {
     activity: "peek",
     mood: "waiting",
+    speech: 0,
     message: "先写下一件今天要做的事，我会在这里等你。",
   });
 
@@ -78,5 +79,6 @@ test("home pet companion rotates encouragement and idle activities", () => {
 
   assert.notEqual(first.message, second.message);
   assert.notEqual(first.activity, second.activity);
+  assert.notEqual(first.speech, second.speech);
   assert.equal(first.mood, "ready");
 });

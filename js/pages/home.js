@@ -1,4 +1,4 @@
-import { createPetProgress, getEvolutionStage, getNextStageProgress, normalizePetType, renderPetImage } from "../pet.js";
+import { createPetProgress, getEvolutionStage, getNextStageProgress, normalizePetType, renderPetActivity } from "../pet.js";
 import { PET_TYPES } from "../state.js";
 
 const PET_COMPANION_MESSAGES = [
@@ -20,11 +20,13 @@ export function getHomePetCompanionState({ tasks, todayData, messageIndex = 0 })
   const allTasksCompleted = tasks.length > 0 && unfinishedTasks.length === 0;
   const goalReached = todayData.completedCount > 0
     && todayData.completedCount >= todayData.dailyGoal;
+  const safeIndex = Math.abs(Number(messageIndex) || 0);
 
   if (tasks.length === 0) {
     return {
       activity: "peek",
       mood: "waiting",
+      speech: safeIndex % 2,
       message: "先写下一件今天要做的事，我会在这里等你。",
     };
   }
@@ -33,14 +35,15 @@ export function getHomePetCompanionState({ tasks, todayData, messageIndex = 0 })
     return {
       activity: "hop",
       mood: "celebrate",
+      speech: safeIndex % 2,
       message: "今天已经很棒啦，记得把这份节奏带到明天。",
     };
   }
 
-  const safeIndex = Math.abs(Number(messageIndex) || 0);
   return {
     activity: PET_IDLE_ACTIVITIES[safeIndex % PET_IDLE_ACTIVITIES.length],
     mood: todayData.completedCount > 0 ? "happy" : "ready",
+    speech: safeIndex % 2,
     message: PET_COMPANION_MESSAGES[safeIndex % PET_COMPANION_MESSAGES.length],
   };
 }
@@ -66,9 +69,10 @@ export function renderHomePage({ elements, tasks, todayData, formatPlanDate, mes
   if (elements.homePetCompanion) {
     elements.homePetCompanion.dataset.activity = companionState.activity;
     elements.homePetCompanion.dataset.mood = companionState.mood;
+    elements.homePetCompanion.dataset.speech = String(companionState.speech);
   }
   if (elements.homePetMessage) elements.homePetMessage.textContent = companionState.message;
-  if (elements.homePetArt) elements.homePetArt.innerHTML = renderPetImage(petId, stage.id, "choice");
+  if (elements.homePetArt) elements.homePetArt.innerHTML = renderPetActivity(petId, stage.id);
   if (elements.homePetProgressFill) elements.homePetProgressFill.style.width = `${xpPercent}%`;
   if (elements.homePetNextHint) {
     const nextStage = getNextStageProgress(progress, todayData.focusDuration);

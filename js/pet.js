@@ -168,3 +168,18 @@ export function renderPetImage(typeKey, evolutionStageId, renderMode) {
     </span>
   `;
 }
+
+export function renderPetActivity(typeKey, evolutionStageId) {
+  const pet = PET_TYPES[normalizePetType(typeKey)];
+  const stageIndex = Math.max(0, Math.min(3, Number(evolutionStageId) - 1));
+  const stagePosition = stageIndex === 0 ? 0 : (stageIndex / 3) * 100;
+
+  return `
+    <span
+      class="pet-activity-sprite"
+      role="img"
+      aria-label="${pet.name}正在活动"
+      style="--pet-activity-image: url('${pet.activitySrc}'); --pet-stage-position: ${stagePosition}%;"
+    ></span>
+  `;
+}

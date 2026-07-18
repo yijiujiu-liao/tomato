@@ -194,16 +194,24 @@
           </div>
           <p class="progress-text" id="timerProgressText">本轮已完成 0%</p>
 
-          <section class="timer-pet-companion" id="homePetCompanion" data-activity="breathe" data-mood="ready" aria-label="当前宠物陪伴">
-            <div class="timer-pet-stage" aria-hidden="true">
-              <div class="home-pet-art" id="homePetArt"></div>
+          <section class="timer-pet-companion" id="homePetCompanion" data-activity="breathe" data-mood="ready" data-speech="0" aria-label="当前宠物活动区">
+            <div class="pet-playground-scenery" aria-hidden="true">
+              <span class="pet-cloud pet-cloud-one"></span>
+              <span class="pet-cloud pet-cloud-two"></span>
+              <span class="pet-playground-leaf"></span>
+              <span class="pet-playground-toy"></span>
             </div>
-            <div class="timer-pet-copy">
+            <div class="timer-pet-speech" aria-live="polite">
+              <p id="homePetMessage">别着急，我陪你把这一轮稳稳完成。</p>
+            </div>
+            <div class="timer-pet-roamer" aria-hidden="true">
+              <div class="timer-pet-sprite-host" id="homePetArt"></div>
+            </div>
+            <div class="timer-pet-hud">
               <div class="timer-pet-heading">
                 <strong id="homePetChip">蓝莓企鹅 Lv.1</strong>
                 <span id="homeGoalProgress">0 / 8 番茄</span>
               </div>
-              <p class="timer-pet-message" id="homePetMessage">别着急，我陪你把这一轮稳稳完成。</p>
               <div class="home-pet-progress" aria-label="当前宠物经验进度">
                 <div id="homePetProgressFill"></div>
               </div>
