@@ -1,13 +1,9 @@
 import { createPetProgress, getEvolutionStage, getNextStageProgress, normalizePetType, renderPetImage } from "../pet.js";
 import { PET_TYPES } from "../state.js";
 
-export function addTaskAndStartFocus({ title, addTask, startFocus }) {
+export function addHomeTask({ title, addTask }) {
   const cleanTitle = String(title || "").trim();
-  if (!addTask(cleanTitle)) {
-    return { added: false, started: false };
-  }
-
-  return { added: true, started: Boolean(startFocus()) };
+  return { added: Boolean(addTask(cleanTitle)) };
 }
 
 export function renderHomePage({ elements, tasks, todayData, formatPlanDate }) {

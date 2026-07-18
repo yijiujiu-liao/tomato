@@ -28,7 +28,7 @@ import {
   getAiTomorrowSuggestions
 } from "./js/aiReview.js";
 import {
-  addTaskAndStartFocus,
+  addHomeTask,
   renderHomePage as renderHomePageView
 } from "./js/pages/home.js";
 import { createTasksPageController } from "./js/pages/tasks.js";
@@ -1155,10 +1155,9 @@ function handleAddTask() {
 
 function handleHomeQuickTask() {
   const title = homeQuickTaskInput?.value.trim() || "";
-  const result = addTaskAndStartFocus({
+  const result = addHomeTask({
     title,
     addTask,
-    startFocus: startTimer,
   });
 
   if (!result.added) {

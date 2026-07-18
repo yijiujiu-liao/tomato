@@ -1,38 +1,28 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { addTaskAndStartFocus, getHomeReviewState } from "../js/pages/home.js";
+import { addHomeTask, getHomeReviewState } from "../js/pages/home.js";
 
-test("home quick task immediately starts an immersive focus session", () => {
+test("home quick task only adds the task", () => {
   const calls = [];
-  const result = addTaskAndStartFocus({
+  const result = addHomeTask({
     title: "  数学：整理 10 道错题  ",
     addTask: (title) => {
       calls.push(["add", title]);
       return true;
     },
-    startFocus: () => {
-      calls.push(["start"]);
-      return true;
-    },
   });
 
-  assert.deepEqual(result, { added: true, started: true });
-  assert.deepEqual(calls, [["add", "数学：整理 10 道错题"], ["start"]]);
+  assert.deepEqual(result, { added: true });
+  assert.deepEqual(calls, [["add", "数学：整理 10 道错题"]]);
 });
 
-test("home quick task does not start focus when the title is invalid", () => {
-  let started = false;
-  const result = addTaskAndStartFocus({
+test("home quick task rejects an invalid title", () => {
+  const result = addHomeTask({
     title: "   ",
     addTask: () => false,
-    startFocus: () => {
-      started = true;
-      return true;
-    },
   });
 
-  assert.deepEqual(result, { added: false, started: false });
-  assert.equal(started, false);
+  assert.deepEqual(result, { added: false });
 });
 
 test("home review CTA appears only when today is ready to close", () => {
