@@ -379,7 +379,16 @@ def normalize_atlas(input_path, output_path):
             )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output.save(output_path, optimize=True)
+    if output_path.suffix.lower() == ".webp":
+        output.save(
+            output_path,
+            "WEBP",
+            quality=82,
+            method=6,
+            exact=True,
+        )
+    else:
+        output.save(output_path, optimize=True)
     return report, repaired_loops
 
 
