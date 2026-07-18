@@ -212,6 +212,10 @@ body[data-page="home"] .plan-header h2 {
     height: 148px;
   }
 
+  .pet-activity-sprite {
+    --pet-strip-width: 9472px;
+  }
+
   .timer-pet-roamer {
     bottom: 9px;
     left: 50%;

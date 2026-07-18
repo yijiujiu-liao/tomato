@@ -22,8 +22,9 @@ except ImportError:
 
 ROWS = 4
 SOURCE_COLUMNS = 8
-OUTPUT_COLUMNS = 16
+OUTPUT_COLUMNS = 64
 CELL_SIZE = 256
+OUTPUT_CELL_SIZE = 128
 BASELINE = 244
 ALPHA_THRESHOLD = 24
 
@@ -196,10 +197,7 @@ def remap_channel(channel, flow, progress):
     )
 
 
-def motion_intermediate(first, second, progress=0.5):
-    if cv2 is None:
-        return alpha_aware_blend(first, second, progress)
-
+def calculate_motion_fields(first, second):
     first_reference = flow_reference(first)
     second_reference = flow_reference(second)
     flow_forward = cv2.calcOpticalFlowFarneback(
@@ -225,6 +223,18 @@ def motion_intermediate(first, second, progress=0.5):
         7,
         1.5,
         0,
+    )
+    return flow_forward, flow_backward
+
+
+def motion_intermediate(first, second, progress=0.5, motion_fields=None):
+    if cv2 is None:
+        return alpha_aware_blend(first, second, progress)
+
+    flow_forward, flow_backward = (
+        motion_fields
+        if motion_fields is not None
+        else calculate_motion_fields(first, second)
     )
 
     first_array = np.asarray(first, dtype=np.float32) / 255
@@ -288,12 +298,26 @@ def stabilize_frame(frame):
 
 def add_in_between_frames(frames):
     expanded = []
+    frames_per_transition = OUTPUT_COLUMNS // len(frames)
     for index, frame in enumerate(frames):
         next_frame = frames[(index + 1) % len(frames)]
         expanded.append(frame)
-        expanded.append(
-            stabilize_frame(motion_intermediate(frame, next_frame))
+        motion_fields = (
+            calculate_motion_fields(frame, next_frame)
+            if cv2 is not None
+            else None
         )
+        for step in range(1, frames_per_transition):
+            expanded.append(
+                stabilize_frame(
+                    motion_intermediate(
+                        frame,
+                        next_frame,
+                        step / frames_per_transition,
+                        motion_fields,
+                    )
+                )
+            )
     return expanded
 
 
@@ -326,7 +350,7 @@ def normalize_atlas(input_path, output_path):
     rows = split_cells(source)
     output = Image.new(
         "RGBA",
-        (OUTPUT_COLUMNS * CELL_SIZE, ROWS * CELL_SIZE),
+        (OUTPUT_COLUMNS * OUTPUT_CELL_SIZE, ROWS * OUTPUT_CELL_SIZE),
         (0, 0, 0, 0),
     )
     report = []
@@ -339,9 +363,16 @@ def normalize_atlas(input_path, output_path):
             repaired_loops.append(row_index + 1)
         expanded = add_in_between_frames(normalized)
         for column_index, frame in enumerate(expanded):
+            output_frame = frame.resize(
+                (OUTPUT_CELL_SIZE, OUTPUT_CELL_SIZE),
+                Image.Resampling.LANCZOS,
+            )
             output.alpha_composite(
-                frame,
-                (column_index * CELL_SIZE, row_index * CELL_SIZE),
+                output_frame,
+                (
+                    column_index * OUTPUT_CELL_SIZE,
+                    row_index * OUTPUT_CELL_SIZE,
+                ),
             )
             report.append(
                 frame_metrics(frame, row_index + 1, column_index + 1)
