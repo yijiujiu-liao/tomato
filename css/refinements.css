@@ -202,25 +202,26 @@ body[data-page="home"] .plan-header h2 {
 
 @media (max-width: 390px) {
   .timer-pet-companion {
-    min-height: 184px;
+    min-height: 198px;
   }
 
   .timer-pet-roamer,
   .timer-pet-sprite-host,
   .pet-activity-sprite {
-    width: 108px;
-    height: 108px;
+    width: 116px;
+    height: 116px;
   }
 
   .timer-pet-roamer {
-    bottom: 48px;
-    left: 8px;
+    bottom: 49px;
+    left: 10px;
   }
 
   .timer-pet-speech {
-    right: 10px;
-    width: min(205px, 62%);
-    padding: 8px 10px;
+    top: 34px;
+    right: 9px;
+    width: min(196px, 60%);
+    padding: 9px 10px;
   }
 
   .timer-pet-speech p {
@@ -228,8 +229,12 @@ body[data-page="home"] .plan-header h2 {
   }
 
   .timer-pet-hud {
-    right: 7px;
-    left: 7px;
+    right: 8px;
+    left: 8px;
+  }
+
+  .pet-presence {
+    left: 12px;
   }
 }
 

@@ -8,8 +8,6 @@ const PET_COMPANION_MESSAGES = [
   "肩膀放松，先做好眼前这一件事。",
 ];
 
-const PET_IDLE_ACTIVITIES = ["breathe", "peek", "hop"];
-
 export function addHomeTask({ title, addTask }) {
   const cleanTitle = String(title || "").trim();
   return { added: Boolean(addTask(cleanTitle)) };
@@ -24,26 +22,20 @@ export function getHomePetCompanionState({ tasks, todayData, messageIndex = 0 })
 
   if (tasks.length === 0) {
     return {
-      activity: "peek",
       mood: "waiting",
-      speech: safeIndex % 2,
       message: "先写下一件今天要做的事，我会在这里等你。",
     };
   }
 
   if (allTasksCompleted || goalReached) {
     return {
-      activity: "hop",
       mood: "celebrate",
-      speech: safeIndex % 2,
       message: "今天已经很棒啦，记得把这份节奏带到明天。",
     };
   }
 
   return {
-    activity: PET_IDLE_ACTIVITIES[safeIndex % PET_IDLE_ACTIVITIES.length],
     mood: todayData.completedCount > 0 ? "happy" : "ready",
-    speech: safeIndex % 2,
     message: PET_COMPANION_MESSAGES[safeIndex % PET_COMPANION_MESSAGES.length],
   };
 }
@@ -67,9 +59,8 @@ export function renderHomePage({ elements, tasks, todayData, formatPlanDate, mes
   });
   renderAiPlanBanner(elements, tasks);
   if (elements.homePetCompanion) {
-    elements.homePetCompanion.dataset.activity = companionState.activity;
     elements.homePetCompanion.dataset.mood = companionState.mood;
-    elements.homePetCompanion.dataset.speech = String(companionState.speech);
+    elements.homePetCompanion.style.setProperty("--companion-accent", petType.accent);
   }
   if (elements.homePetMessage) elements.homePetMessage.textContent = companionState.message;
   if (elements.homePetArt) elements.homePetArt.innerHTML = renderPetActivity(petId, stage.id);

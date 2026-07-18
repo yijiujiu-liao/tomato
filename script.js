@@ -9,6 +9,7 @@ import { createAuthFeatureView } from "./js/components/authFeature.js";
 import { createTimerPanel } from "./js/components/timerPanel.js";
 import { createTaskSwipeController } from "./js/components/taskSwipe.js";
 import { createStudyGoalsView } from "./js/components/studyGoals.js";
+import { createPetCompanionController } from "./js/components/petCompanion.js";
 import {
   buildFocusCompleteMessage,
   createFocusCompleteView,
@@ -371,6 +372,19 @@ let focusFlowController = null;
 const todayStore = createTodayStore({ storage: localStorage, key: STORAGE_KEY, getDateKey });
 let todayData = todayStore.load();
 let homePetMessageIndex = 0;
+const homePetCompanionController = createPetCompanionController({
+  element: homePetCompanion,
+  isActive: () => (
+    !document.hidden
+    && authGate.hidden
+    && document.body.dataset.page === "home"
+    && !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  ),
+  onSpeak: () => {
+    homePetMessageIndex += 1;
+    renderHomePage();
+  },
+});
 const cloudStatsController = createCloudStatsController({
   isEnabled: isCloudSyncEnabled,
   fetchStats: (range) => cloudRepository.fetchStats(range),
@@ -594,11 +608,7 @@ setupCurrentGoalUI();
 placeDataUtilitiesLast();
 refreshAuthUI();
 bootstrapCloudSession();
-window.setInterval(() => {
-  if (document.hidden || document.body.dataset.page !== "home") return;
-  homePetMessageIndex += 1;
-  renderHomePage();
-}, 9000);
+homePetCompanionController.start();
 
 startBtn.addEventListener("click", startTimer);
 pauseBtn.addEventListener("click", pauseTimer);

@@ -54,9 +54,7 @@ test("home pet companion guides empty days and celebrates completed plans", () =
     tasks: [],
     todayData: { completedCount: 0, dailyGoal: 4 },
   }), {
-    activity: "peek",
     mood: "waiting",
-    speech: 0,
     message: "先写下一件今天要做的事，我会在这里等你。",
   });
 
@@ -64,12 +62,11 @@ test("home pet companion guides empty days and celebrates completed plans", () =
     tasks: [{ completed: true }],
     todayData: { completedCount: 1, dailyGoal: 4 },
   });
-  assert.equal(completed.activity, "hop");
   assert.equal(completed.mood, "celebrate");
   assert.match(completed.message, /今天已经很棒/);
 });
 
-test("home pet companion rotates encouragement and idle activities", () => {
+test("home pet companion rotates encouragement without owning animation timing", () => {
   const base = {
     tasks: [{ completed: false }],
     todayData: { completedCount: 0, dailyGoal: 4 },
@@ -78,7 +75,5 @@ test("home pet companion rotates encouragement and idle activities", () => {
   const second = getHomePetCompanionState({ ...base, messageIndex: 1 });
 
   assert.notEqual(first.message, second.message);
-  assert.notEqual(first.activity, second.activity);
-  assert.notEqual(first.speech, second.speech);
   assert.equal(first.mood, "ready");
 });
