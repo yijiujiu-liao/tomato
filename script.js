@@ -102,13 +102,9 @@ const appPages = document.querySelectorAll(".app-page");
 const todayTaskMount = document.querySelector("#todayTaskMount");
 const todayTimerMount = document.querySelector("#todayTimerMount");
 const homeDateText = document.querySelector("#homeDateText");
-const homeGoalProgress = document.querySelector("#homeGoalProgress");
 const homePetCompanion = document.querySelector("#homePetCompanion");
-const homePetChip = document.querySelector("#homePetChip");
 const homePetArt = document.querySelector("#homePetArt");
 const homePetMessage = document.querySelector("#homePetMessage");
-const homePetProgressFill = document.querySelector("#homePetProgressFill");
-const homePetNextHint = document.querySelector("#homePetNextHint");
 const homeNextTaskTitle = document.querySelector("#homeNextTaskTitle");
 const homeNextTaskHint = document.querySelector("#homeNextTaskHint");
 const homeQuickTask = document.querySelector("#homeQuickTask");
@@ -1411,17 +1407,13 @@ function renderHomePage() {
   renderHomePageView({
     elements: {
       homeDateText,
-      homeGoalProgress,
       homePetCompanion,
-      homePetChip,
       homePetMessage,
       homeNextTaskTitle,
       homeNextTaskHint,
       homeQuickTask,
       homeReviewBtn,
       homePetArt,
-      homePetProgressFill,
-      homePetNextHint,
       aiPlanBanner,
       aiPlanBannerTitle,
       aiPlanBannerText

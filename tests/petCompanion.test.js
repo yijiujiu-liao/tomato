@@ -15,8 +15,8 @@ test("pet companion chooses finite actions without an immediate repeat", () => {
     random: () => 0,
   });
 
-  assert.equal(first.name, "glance");
-  assert.equal(first.duration, 1600);
+  assert.equal(first.name, "walk");
+  assert.equal(first.duration, 3600);
   assert.notEqual(second.name, first.name);
 });
 
@@ -53,11 +53,11 @@ test("pet companion returns to a still idle state after each action", () => {
   assert.equal(timers[0].delay, 4200);
 
   timers[0].callback();
-  assert.equal(element.dataset.action, "glance");
-  assert.equal(element.dataset.speaking, "true");
-  assert.equal(speechCount, 1);
+  assert.equal(element.dataset.action, "walk");
+  assert.equal(element.dataset.speaking, "false");
+  assert.equal(speechCount, 0);
 
-  const actionTimer = timers.find((timer) => timer.delay === 1600);
+  const actionTimer = timers.find((timer) => timer.delay === 3600);
   actionTimer.callback();
   assert.equal(element.dataset.action, "idle");
   assert.ok(timers.some((timer) => timer.delay === 8500));

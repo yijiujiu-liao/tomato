@@ -202,7 +202,7 @@ body[data-page="home"] .plan-header h2 {
 
 @media (max-width: 390px) {
   .timer-pet-companion {
-    min-height: 198px;
+    min-height: 184px;
   }
 
   .timer-pet-roamer,
@@ -213,7 +213,7 @@ body[data-page="home"] .plan-header h2 {
   }
 
   .timer-pet-roamer {
-    bottom: 57px;
+    bottom: 15px;
     left: 10px;
   }
 
@@ -226,29 +226,6 @@ body[data-page="home"] .plan-header h2 {
 
   .timer-pet-speech p {
     font-size: 11px;
-  }
-
-  .timer-pet-hud {
-    right: 8px;
-    left: 8px;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 4px;
-    padding: 7px 9px;
-  }
-
-  .timer-pet-hud .timer-pet-heading {
-    grid-column: 1;
-    justify-content: space-between;
-  }
-
-  .timer-pet-hud .home-pet-progress {
-    grid-row: 2;
-    grid-column: 1;
-  }
-
-  .timer-pet-hud .home-pet-next {
-    grid-row: 3;
-    grid-column: 1;
   }
 
   .pet-presence {

@@ -545,61 +545,10 @@ body.dark .ai-plan-banner {
   border: 1px solid rgba(37, 99, 90, 0.14);
 }
 
-.timer-pet-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.timer-pet-heading strong {
-  overflow: hidden;
-  color: var(--ink);
-  font-size: 14px;
-  font-weight: 950;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.timer-pet-heading span {
-  flex: 0 0 auto;
-  padding: 4px 7px;
-  border-radius: 999px;
-  color: var(--brand);
-  background: var(--soft);
-  font-size: 10px;
-  font-weight: 950;
-  white-space: nowrap;
-}
-
-.home-pet-progress {
-  overflow: hidden;
-  height: 9px;
-  border-radius: 999px;
-  background: var(--soft);
-}
-
-.home-pet-progress div {
-  width: 0%;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, var(--accent), var(--brand));
-  transition: width 0.3s ease;
-}
-
-.home-pet-next {
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 800;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* The home companion is a small playground, not another information card. */
+/* A calm companion scene with occasional finite actions. */
 .timer-pet-companion {
   display: block;
-  min-height: 208px;
+  min-height: 190px;
   padding: 0;
   border-color: rgba(40, 67, 60, 0.11);
   border-radius: 22px;
@@ -634,7 +583,7 @@ body.dark .timer-pet-companion {
   content: "";
   position: absolute;
   right: 18px;
-  bottom: 46px;
+  bottom: 12px;
   left: 18px;
   height: 66px;
   border-radius: 50%;
@@ -647,7 +596,7 @@ body.dark .timer-pet-companion {
   content: "";
   position: absolute;
   right: 24px;
-  bottom: 59px;
+  bottom: 27px;
   left: 24px;
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(53, 91, 80, 0.16), transparent);
@@ -682,10 +631,23 @@ body.dark .timer-pet-companion {
   background: rgba(255, 251, 237, 0.76);
 }
 
+.pet-ground-track {
+  position: absolute;
+  right: -96px;
+  bottom: 15px;
+  left: -96px;
+  height: 28px;
+  opacity: 0.7;
+  background:
+    radial-gradient(ellipse at center, rgba(54, 85, 75, 0.13) 0 24%, transparent 26%) 0 14px / 48px 8px repeat-x,
+    linear-gradient(90deg, transparent 0 4%, rgba(54, 85, 75, 0.08) 16% 84%, transparent 96%) center bottom / 100% 1px no-repeat;
+  will-change: transform;
+}
+
 .pet-playground-leaf {
   position: absolute;
   right: 25px;
-  bottom: 63px;
+  bottom: 31px;
   left: auto;
   width: 7px;
   height: 31px;
@@ -711,7 +673,7 @@ body.dark .timer-pet-companion {
 .pet-playground-toy {
   position: absolute;
   right: 46px;
-  bottom: 61px;
+  bottom: 29px;
   width: 26px;
   height: 8px;
   border: 0;
@@ -805,7 +767,7 @@ body.dark .timer-pet-speech {
 .timer-pet-roamer {
   position: absolute;
   z-index: 3;
-  bottom: 48px;
+  bottom: 17px;
   left: 19px;
   width: 132px;
   height: 132px;
@@ -844,6 +806,10 @@ body.dark .timer-pet-speech {
   animation: none;
 }
 
+.timer-pet-companion[data-action="walk"] .pet-activity-sprite {
+  animation: petFramesWalk 3.6s steps(1, end) both;
+}
+
 .timer-pet-companion[data-action="glance"] .pet-activity-sprite {
   animation: petFramesGlance 1.6s steps(1, end) both;
 }
@@ -858,6 +824,19 @@ body.dark .timer-pet-speech {
 
 .timer-pet-companion[data-action="celebrate"] .pet-activity-sprite {
   animation: petFramesCelebrate 2.2s steps(1, end) both;
+}
+
+.timer-pet-companion[data-action="walk"] .timer-pet-roamer {
+  animation: petMotionWalk 3.6s linear both;
+}
+
+.timer-pet-companion[data-action="walk"] .pet-ground-track {
+  animation: petGroundMoveLeft 3.6s linear both;
+}
+
+.timer-pet-companion[data-action="walk"] .pet-playground-leaf,
+.timer-pet-companion[data-action="walk"] .pet-playground-toy {
+  animation: petSceneryMoveLeft 3.6s linear both;
 }
 
 .timer-pet-companion[data-action="glance"] .timer-pet-roamer {
@@ -876,52 +855,31 @@ body.dark .timer-pet-speech {
   animation: petMotionCelebrate 2.2s cubic-bezier(0.2, 0.72, 0.25, 1) both;
 }
 
-.timer-pet-hud {
-  position: absolute;
-  z-index: 5;
-  right: 11px;
-  bottom: 10px;
-  left: 11px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(92px, 1.2fr);
-  align-items: center;
-  gap: 5px 12px;
-  min-width: 0;
-  padding: 8px 10px;
-  border: 1px solid rgba(41, 69, 61, 0.09);
-  border-radius: 13px;
-  background: rgba(250, 250, 246, 0.72);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.72),
-    0 7px 18px rgba(34, 59, 52, 0.06);
-  backdrop-filter: blur(14px);
-}
+@keyframes petFramesWalk {
+  0%,
+  100% {
+    background-position-x: 0%;
+  }
 
-body.dark .timer-pet-hud {
-  border-color: rgba(255, 255, 255, 0.06);
-  background: rgba(20, 36, 31, 0.7);
-}
+  10%,
+  50% {
+    background-position-x: 18.1818%;
+  }
 
-.timer-pet-hud .timer-pet-heading {
-  justify-content: flex-start;
-  min-width: 0;
-  gap: 6px;
-}
+  20%,
+  60% {
+    background-position-x: 27.2727%;
+  }
 
-.timer-pet-hud .timer-pet-heading span {
-  padding: 3px 7px;
-  background: rgba(37, 99, 90, 0.08);
-}
+  30%,
+  70% {
+    background-position-x: 9.0909%;
+  }
 
-.timer-pet-hud .home-pet-progress {
-  grid-row: 1;
-  grid-column: 2;
-  height: 5px;
-  background: rgba(37, 99, 90, 0.08);
-}
-
-.timer-pet-hud .home-pet-next {
-  grid-column: 1 / -1;
+  40%,
+  80% {
+    background-position-x: 36.3636%;
+  }
 }
 
 @keyframes petFramesGlance {
@@ -1030,6 +988,75 @@ body.dark .timer-pet-hud {
   }
 }
 
+@keyframes petMotionWalk {
+  0% {
+    opacity: 0;
+    transform: translateX(0);
+  }
+
+  7% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  84% {
+    opacity: 1;
+    transform: translateX(120%);
+  }
+
+  92% {
+    opacity: 0;
+    transform: translateX(126%);
+  }
+
+  93% {
+    opacity: 0;
+    transform: translateX(0);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes petGroundMoveLeft {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-96px);
+  }
+}
+
+@keyframes petSceneryMoveLeft {
+  0% {
+    opacity: 1;
+    translate: 0 0;
+  }
+
+  82% {
+    opacity: 1;
+    translate: -92px 0;
+  }
+
+  91% {
+    opacity: 0;
+    translate: -104px 0;
+  }
+
+  92% {
+    opacity: 0;
+    translate: 0 0;
+  }
+
+  100% {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
 @keyframes petMotionGlance {
   0%,
   100% {
@@ -1118,6 +1145,9 @@ body.dark .timer-pet-hud {
 @media (prefers-reduced-motion: reduce) {
   .timer-pet-roamer,
   .pet-activity-sprite,
+  .pet-ground-track,
+  .pet-playground-leaf,
+  .pet-playground-toy,
   .timer-pet-speech {
     animation: none !important;
   }

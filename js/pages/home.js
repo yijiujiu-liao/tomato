@@ -1,4 +1,4 @@
-import { createPetProgress, getEvolutionStage, getNextStageProgress, normalizePetType, renderPetActivity } from "../pet.js";
+import { createPetProgress, getEvolutionStage, normalizePetType, renderPetActivity } from "../pet.js";
 import { PET_TYPES } from "../state.js";
 
 const PET_COMPANION_MESSAGES = [
@@ -46,15 +46,12 @@ export function renderHomePage({ elements, tasks, todayData, formatPlanDate, mes
   const petId = normalizePetType(progress.petId || todayData.selectedPet);
   const petType = PET_TYPES[petId];
   const stage = getEvolutionStage(progress.level);
-  const xpPercent = Math.min(100, Math.round((progress.currentXP / progress.nextLevelXP) * 100));
   const companionState = getHomePetCompanionState({ tasks, todayData, messageIndex });
 
   renderHomePageView({
     elements,
     tasks,
     todayData,
-    petName: petType.name,
-    petLevel: progress.level,
     formatPlanDate,
   });
   renderAiPlanBanner(elements, tasks);
@@ -64,13 +61,6 @@ export function renderHomePage({ elements, tasks, todayData, formatPlanDate, mes
   }
   if (elements.homePetMessage) elements.homePetMessage.textContent = companionState.message;
   if (elements.homePetArt) elements.homePetArt.innerHTML = renderPetActivity(petId, stage.id);
-  if (elements.homePetProgressFill) elements.homePetProgressFill.style.width = `${xpPercent}%`;
-  if (elements.homePetNextHint) {
-    const nextStage = getNextStageProgress(progress, todayData.focusDuration);
-    elements.homePetNextHint.textContent = nextStage
-      ? `再完成约 ${nextStage.tomatoes} 个番茄，解锁下一阶段`
-      : "已经是完全体，继续积累长期成长。";
-  }
 }
 
 export function getHomeReviewState({ tasks, completedCount, dailyGoal }) {
@@ -105,8 +95,6 @@ export function renderHomePageView({
   elements,
   tasks,
   todayData,
-  petName,
-  petLevel,
   formatPlanDate
 }) {
   if (!elements.homeDateText) {
@@ -117,10 +105,6 @@ export function renderHomePageView({
   const selectedTask = tasks.find((task) => task.id === todayData.currentTaskId && !task.completed);
 
   elements.homeDateText.textContent = formatPlanDate(new Date());
-  if (elements.homeGoalProgress) {
-    elements.homeGoalProgress.textContent = `${todayData.completedCount} / ${todayData.dailyGoal} 番茄`;
-  }
-  if (elements.homePetChip) elements.homePetChip.textContent = `${petName} Lv.${petLevel}`;
   elements.homeQuickTask.hidden = tasks.length > 0;
   if (elements.homeReviewBtn) {
     const reviewState = getHomeReviewState({

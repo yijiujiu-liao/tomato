@@ -1,4 +1,5 @@
 const PET_ACTIONS = Object.freeze({
+  walk: { name: "walk", duration: 3600 },
   glance: { name: "glance", duration: 1600 },
   stretch: { name: "stretch", duration: 1900 },
   hop: { name: "hop", duration: 1750 },
@@ -6,10 +7,10 @@ const PET_ACTIONS = Object.freeze({
 });
 
 const ACTIONS_BY_MOOD = Object.freeze({
-  waiting: ["glance", "stretch"],
-  ready: ["glance", "stretch", "hop"],
-  happy: ["glance", "stretch", "hop", "celebrate"],
-  celebrate: ["hop", "celebrate", "glance"],
+  waiting: ["walk", "walk", "glance", "stretch"],
+  ready: ["walk", "walk", "glance", "stretch", "hop"],
+  happy: ["walk", "walk", "glance", "stretch", "hop", "celebrate"],
+  celebrate: ["walk", "hop", "celebrate", "glance"],
 });
 
 export function getPetActionDelay(random = Math.random, initial = false) {
@@ -91,7 +92,7 @@ export function createPetCompanionController({
     actionsSinceSpeech += 1;
     element.dataset.action = action.name;
 
-    if (shouldShowPetSpeech(actionsSinceSpeech, random)) {
+    if (action.name !== "walk" && shouldShowPetSpeech(actionsSinceSpeech, random)) {
       actionsSinceSpeech = 0;
       onSpeak();
       element.dataset.speaking = "true";
