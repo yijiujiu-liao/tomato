@@ -272,7 +272,7 @@ body[data-page="home"]:not(.show-full-plan) .task-card-front {
   padding: 10px;
   border: 0;
   border-radius: 10px;
-  background: transparent;
+  background: var(--card-bg);
   box-shadow: none;
 }
 
