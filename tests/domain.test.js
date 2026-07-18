@@ -87,7 +87,7 @@ test("pet activity renderer selects the animated atlas and evolution row", () =>
   const juvenile = renderPetActivity("purpleDragon", 1);
   const evolved = renderPetActivity("purpleDragon", 3);
 
-  assert.match(juvenile, /purple-dragon-walk-v4\.webp/);
+  assert.match(juvenile, /purple-dragon-walk-v5\.webp/);
   assert.match(juvenile, /--pet-stage-position: 0%/);
   assert.match(juvenile, /--pet-activity-scale: 1\.2/);
   assert.match(evolved, /--pet-stage-position: 66\.666/);

@@ -3,10 +3,10 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const ASSETS = [
-  "assets/pets/penguin-walk-v4.webp",
-  "assets/pets/purple-dragon-walk-v4.webp",
-  "assets/pets/green-dino-walk-v4.webp",
-  "assets/pets/chick-walk-v4.webp",
+  "assets/pets/penguin-walk-v5.webp",
+  "assets/pets/purple-dragon-walk-v5.webp",
+  "assets/pets/green-dino-walk-v5.webp",
+  "assets/pets/chick-walk-v5.webp",
 ];
 
 function readWebpDimensions(buffer) {

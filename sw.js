@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaoyan-pomodoro-v72";
+const CACHE_NAME = "kaoyan-pomodoro-v73";
 const ASSETS = [
   "./",
   "./index.html",

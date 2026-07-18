@@ -3,9 +3,10 @@
 
 import argparse
 import json
+import math
 from pathlib import Path
 
-from PIL import Image, ImageChops, ImageStat
+from PIL import Image, ImageChops, ImageFilter, ImageStat
 
 try:
     import numpy as np
@@ -64,6 +65,31 @@ def upper_body_centroid_x(image):
     return sum(x * weight for x, weight in enumerate(weights)) / total
 
 
+def retain_primary_subject(image):
+    if cv2 is None:
+        return image
+
+    alpha = np.asarray(image.getchannel("A"))
+    foreground = (alpha >= ALPHA_THRESHOLD).astype(np.uint8)
+    component_count, labels, stats, _ = cv2.connectedComponentsWithStats(
+        foreground,
+        connectivity=8,
+    )
+    if component_count <= 2:
+        return image
+
+    primary_label = 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
+    primary_mask = Image.fromarray(
+        np.where(labels == primary_label, 255, 0).astype(np.uint8),
+        "L",
+    ).filter(ImageFilter.MaxFilter(5))
+    cleaned = image.copy()
+    cleaned.putalpha(
+        ImageChops.multiply(image.getchannel("A"), primary_mask)
+    )
+    return cleaned
+
+
 def split_cells(atlas):
     cells = []
     for row in range(ROWS):
@@ -73,7 +99,9 @@ def split_cells(atlas):
         for column in range(SOURCE_COLUMNS):
             left = round(column * atlas.width / SOURCE_COLUMNS)
             right = round((column + 1) * atlas.width / SOURCE_COLUMNS)
-            cell = atlas.crop((left, top, right, bottom))
+            cell = retain_primary_subject(
+                atlas.crop((left, top, right, bottom))
+            )
             bbox = alpha_bbox(cell)
             if bbox is None:
                 raise ValueError(f"Blank frame at row {row + 1}, column {column + 1}")
@@ -280,7 +308,98 @@ def motion_intermediate(first, second, progress=0.5, motion_fields=None):
     )
 
 
+def endpoint_consistent_motion(first, second, progress, motion_fields):
+    direct = alpha_aware_blend(first, second, progress)
+    motion = motion_intermediate(
+        first,
+        second,
+        progress,
+        motion_fields,
+    )
+    # Optical flow is weakest next to a key pose. Ease it in so the first and
+    # final in-between frames cannot jump away from their exact endpoints.
+    motion_weight = min(
+        1,
+        (math.sin(math.pi * progress) / math.sin(math.pi * 0.375)) ** 2,
+    )
+    return Image.blend(direct, motion, motion_weight)
+
+
+def lower_limb_centroid(frame, cutoff):
+    if np is None:
+        alpha = frame.getchannel("A")
+        total = weighted_x = weighted_y = 0
+        for y in range(cutoff, alpha.height):
+            for x in range(alpha.width):
+                weight = alpha.getpixel((x, y))
+                total += weight
+                weighted_x += x * weight
+                weighted_y += y * weight
+        if total <= 0:
+            return CELL_SIZE / 2, BASELINE
+        return weighted_x / total, weighted_y / total
+
+    alpha = np.asarray(frame.getchannel("A"), dtype=np.float32)
+    alpha[:cutoff, :] = 0
+    total = float(alpha.sum())
+    if total <= 0:
+        return CELL_SIZE / 2, BASELINE
+
+    y_coordinates, x_coordinates = np.indices(alpha.shape)
+    return (
+        float((x_coordinates * alpha).sum() / total),
+        float((y_coordinates * alpha).sum() / total),
+    )
+
+
+def shift_frame(frame, offset_x, offset_y):
+    shifted = Image.new("RGBA", frame.size, (0, 0, 0, 0))
+    shifted.alpha_composite(
+        frame,
+        (round(offset_x), round(offset_y)),
+    )
+    return shifted
+
+
+def preserve_lower_limb_clarity(motion, first, second, progress):
+    bboxes = [bbox for bbox in (alpha_bbox(first), alpha_bbox(second)) if bbox]
+    baseline = max(bbox[3] for bbox in bboxes)
+    subject_height = max(bbox[3] - bbox[1] for bbox in bboxes)
+    limb_height = max(42, min(62, round(subject_height * 0.25)))
+    cutoff = max(0, baseline - limb_height)
+
+    first_center = lower_limb_centroid(first, cutoff)
+    second_center = lower_limb_centroid(second, cutoff)
+    target_center = (
+        first_center[0] * (1 - progress) + second_center[0] * progress,
+        first_center[1] * (1 - progress) + second_center[1] * progress,
+    )
+    source = first if progress < 0.5 else second
+    source_center = first_center if progress < 0.5 else second_center
+    aligned_source = shift_frame(
+        source,
+        max(-8, min(8, target_center[0] - source_center[0])),
+        max(-6, min(6, target_center[1] - source_center[1])),
+    )
+
+    feather = 14
+    mask = Image.new("L", motion.size, 0)
+    mask_pixels = mask.load()
+    for y in range(cutoff, min(CELL_SIZE, cutoff + feather)):
+        amount = (y - cutoff + 1) / feather
+        amount = amount * amount * (3 - 2 * amount)
+        value = round(255 * amount)
+        for x in range(CELL_SIZE):
+            mask_pixels[x, y] = value
+    for y in range(cutoff + feather, CELL_SIZE):
+        for x in range(CELL_SIZE):
+            mask_pixels[x, y] = 255
+
+    return Image.composite(aligned_source, motion, mask)
+
+
 def stabilize_frame(frame):
+    frame = retain_primary_subject(frame)
     bbox = alpha_bbox(frame)
     if bbox is None:
         raise ValueError("Generated in-between frame is blank")
@@ -308,13 +427,19 @@ def add_in_between_frames(frames):
             else None
         )
         for step in range(1, frames_per_transition):
+            progress = step / frames_per_transition
             expanded.append(
                 stabilize_frame(
-                    motion_intermediate(
+                    preserve_lower_limb_clarity(
+                        endpoint_consistent_motion(
+                            frame,
+                            next_frame,
+                            progress,
+                            motion_fields,
+                        ),
                         frame,
                         next_frame,
-                        step / frames_per_transition,
-                        motion_fields,
+                        progress,
                     )
                 )
             )
@@ -367,6 +492,7 @@ def normalize_atlas(input_path, output_path):
                 (OUTPUT_CELL_SIZE, OUTPUT_CELL_SIZE),
                 Image.Resampling.LANCZOS,
             )
+            output_frame = retain_primary_subject(output_frame)
             output.alpha_composite(
                 output_frame,
                 (
