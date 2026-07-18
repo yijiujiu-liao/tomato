@@ -33,22 +33,22 @@ export const STATS_RANGES = {
 export const PET_TYPES = {
   penguin: {
     name: "蓝莓企鹅",
-    src: "assets/pets/penguin.webp",
+    src: "assets/pets/penguin-v2.png",
     accent: "#9fc7ea"
   },
   purpleDragon: {
     name: "紫晶小龙",
-    src: "assets/pets/purple-dragon.webp",
+    src: "assets/pets/purple-dragon-v2.png",
     accent: "#9b6ee8"
   },
   greenDino: {
     name: "青叶恐龙",
-    src: "assets/pets/green-dino.webp",
+    src: "assets/pets/green-dino-v2.png",
     accent: "#94bd55"
   },
   chick: {
     name: "奶油小鸡",
-    src: "assets/pets/chick.webp",
+    src: "assets/pets/chick-v2.png",
     accent: "#f3c34a"
   }
 };
@@ -56,10 +56,10 @@ export const PET_TYPES = {
 export const PET_TYPE_KEYS = Object.keys(PET_TYPES);
 
 export const EVOLUTION_STAGES = [
-  { id: 1, minLevel: 1, maxLevel: 4, state: "juvenile", label: "幼体", sprite: "egg" },
-  { id: 2, minLevel: 5, maxLevel: 9, state: "growth", label: "成长期", sprite: "crack" },
-  { id: 3, minLevel: 10, maxLevel: 19, state: "mature", label: "成熟体", sprite: "peek" },
-  { id: 4, minLevel: 20, maxLevel: Infinity, state: "complete", label: "完全体", sprite: "hatched" }
+  { id: 1, minLevel: 1, maxLevel: 4, state: "juvenile", label: "幼崽", sprite: "baby" },
+  { id: 2, minLevel: 5, maxLevel: 9, state: "growth", label: "成长期", sprite: "young" },
+  { id: 3, minLevel: 10, maxLevel: 19, state: "mature", label: "进化体", sprite: "evolved" },
+  { id: 4, minLevel: 20, maxLevel: Infinity, state: "complete", label: "完全体", sprite: "complete" }
 ];
 
 export const MOTIVATION_TEXTS = [

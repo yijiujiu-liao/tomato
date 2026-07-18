@@ -1,4 +1,4 @@
-const CACHE_NAME = "kaoyan-pomodoro-v59";
+const CACHE_NAME = "kaoyan-pomodoro-v60";
 const ASSETS = [
   "./",
   "./index.html",
@@ -67,10 +67,10 @@ const ASSETS = [
   "./icon-192.png",
   "./icon-512.png",
   "./icon.svg",
-  "./assets/pets/penguin.webp",
-  "./assets/pets/purple-dragon.webp",
-  "./assets/pets/green-dino.webp",
-  "./assets/pets/chick.webp"
+  "./assets/pets/penguin-v2.png",
+  "./assets/pets/purple-dragon-v2.png",
+  "./assets/pets/green-dino-v2.png",
+  "./assets/pets/chick-v2.png"
 ];
 
 self.addEventListener("install", (event) => {

@@ -105,7 +105,7 @@
   position: relative;
   display: grid;
   place-items: center;
-  min-height: 108px;
+  min-height: 150px;
   margin-bottom: 6px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.42);
@@ -150,7 +150,7 @@
 .pet-art {
   position: relative;
   z-index: 1;
-  width: min(60%, 116px);
+  width: min(68%, 140px);
   transform-origin: center bottom;
   animation: petFloat 2.2s ease-in-out infinite;
 }

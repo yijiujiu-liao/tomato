@@ -18,7 +18,7 @@ export function createPetPageView(elements) {
       button.disabled = isLocked;
       button.setAttribute("aria-pressed", String(selectedPet === typeKey));
       button.innerHTML = `
-        <span class="pet-choice-art">${renderPetImage(typeKey, 4, "choice")}</span>
+        <span class="pet-choice-art">${renderPetImage(typeKey, 1, "choice")}</span>
         <span>${petType.name}</span>
       `;
       button.addEventListener("click", () => onSelect(typeKey));
