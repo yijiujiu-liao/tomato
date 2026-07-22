@@ -1,7 +1,7 @@
 node_modules/
 .env
-data/
-backups/
+/data/
+/backups/
 promo-video/
 promo-video/renders/work-*/
 *.log
