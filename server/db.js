@@ -24,6 +24,7 @@ db.exec(`
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     token_hash TEXT NOT NULL UNIQUE,
+    csrf_token_hash TEXT,
     expires_at TEXT NOT NULL,
     created_at TEXT NOT NULL
   );
@@ -128,6 +129,11 @@ const focusSessionColumns = db.prepare("PRAGMA table_info(focus_sessions)").all(
 const taskColumns = db.prepare("PRAGMA table_info(tasks)").all().map((column) => column.name);
 const userSettingsColumns = db.prepare("PRAGMA table_info(user_settings)").all().map((column) => column.name);
 const petColumns = db.prepare("PRAGMA table_info(pets)").all().map((column) => column.name);
+const sessionColumns = db.prepare("PRAGMA table_info(sessions)").all().map((column) => column.name);
+
+if (!sessionColumns.includes("csrf_token_hash")) {
+  db.exec("ALTER TABLE sessions ADD COLUMN csrf_token_hash TEXT");
+}
 
 if (!petColumns.includes("pet_choice_completed")) {
   db.exec("ALTER TABLE pets ADD COLUMN pet_choice_completed INTEGER NOT NULL DEFAULT 0");

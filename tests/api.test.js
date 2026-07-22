@@ -11,6 +11,39 @@ const { app } = await import("../server/index.js");
 const { db, petFromRow } = await import("../server/db.js");
 const { config } = await import("../server/config.js");
 const { createAiSummaryService } = await import("../server/aiService.js");
+const { createSession, hashToken } = await import("../server/auth.js");
+
+class TestCookieSession {
+  constructor() {
+    this.cookies = new Map();
+    this.lastSetCookies = [];
+  }
+
+  absorb(headers) {
+    this.lastSetCookies = headers.getSetCookie();
+    for (const value of this.lastSetCookies) {
+      const [pair] = value.split(";");
+      const separator = pair.indexOf("=");
+      const name = pair.slice(0, separator);
+      const cookieValue = pair.slice(separator + 1);
+      if (/Max-Age=0/i.test(value)) this.cookies.delete(name);
+      else this.cookies.set(name, cookieValue);
+    }
+  }
+
+  header() {
+    return [...this.cookies].map(([name, value]) => `${name}=${value}`).join("; ");
+  }
+
+  csrfToken() {
+    return this.cookies.get("__Host-tomato_csrf") || this.cookies.get("tomato_csrf") || "";
+  }
+
+  deleteCsrf() {
+    this.cookies.delete("__Host-tomato_csrf");
+    this.cookies.delete("tomato_csrf");
+  }
+}
 
 function listen() {
   return new Promise((resolve, reject) => {
@@ -20,14 +53,28 @@ function listen() {
 }
 
 async function request(baseUrl, path, options = {}) {
+  const method = options.method || "GET";
+  const cookieSession = options.cookieSession
+    || (options.token instanceof TestCookieSession ? options.token : null);
+  const cookieHeader = cookieSession?.header() || "";
+  const csrfToken = options.csrfToken ?? cookieSession?.csrfToken();
   const response = await fetch(`${baseUrl}${path}`, {
-    method: options.method || "GET",
+    method,
     headers: {
       "Content-Type": "application/json",
-      ...(options.token ? { Authorization: `Bearer ${options.token}` } : {})
+      ...(typeof options.token === "string" ? { Authorization: `Bearer ${options.token}` } : {}),
+      ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+      ...(
+        options.csrf !== false
+        && ["POST", "PUT", "PATCH", "DELETE"].includes(method)
+        && csrfToken
+          ? { "X-CSRF-Token": csrfToken }
+          : {}
+      ),
     },
     body: options.body ? JSON.stringify(options.body) : undefined
   });
+  cookieSession?.absorb(response.headers);
   const text = await response.text();
   const body = text ? JSON.parse(text) : null;
 
@@ -84,17 +131,72 @@ test("core study management API supports auth, sync, stats, and idempotent offli
 
   const stamp = Date.now();
   const email = `student-${stamp}@example.com`;
+  const token = new TestCookieSession();
   const registered = await request(baseUrl, "/api/auth/register", {
     method: "POST",
+    token,
     body: {
       email,
       password: "password123",
       displayName: "考研同学"
     }
   });
-  const token = registered.session.token;
-
   assert.equal(registered.user.email, email);
+  assert.equal(registered.session.authMode, "cookie");
+  assert.equal(registered.session.token, undefined);
+  const sessionCookie = token.lastSetCookies.find((value) => /tomato_session=/.test(value));
+  const csrfCookie = token.lastSetCookies.find((value) => /tomato_csrf=/.test(value));
+  assert.match(sessionCookie, /HttpOnly/);
+  assert.match(sessionCookie, /SameSite=Lax/);
+  assert.doesNotMatch(sessionCookie, /Secure/);
+  assert.doesNotMatch(csrfCookie, /HttpOnly/);
+
+  const missingCsrf = await request(baseUrl, "/api/settings", {
+    method: "PUT",
+    token,
+    csrf: false,
+    expectedStatus: 403,
+    body: { dailyGoal: 7 },
+  });
+  assert.equal(missingCsrf.code, "CSRF_VALIDATION_FAILED");
+
+  const wrongCsrf = await request(baseUrl, "/api/settings", {
+    method: "PUT",
+    token,
+    csrfToken: "wrong-token",
+    expectedStatus: 403,
+    body: { dailyGoal: 7 },
+  });
+  assert.equal(wrongCsrf.code, "CSRF_VALIDATION_FAILED");
+
+  token.deleteCsrf();
+  const restoredSession = await request(baseUrl, "/api/auth/session", { token });
+  assert.equal(restoredSession.user.id, registered.user.id);
+  assert.ok(token.csrfToken());
+
+  const legacySession = createSession(registered.user.id);
+  const legacyMe = await request(baseUrl, "/api/me", { token: legacySession.token });
+  assert.equal(legacyMe.user.id, registered.user.id);
+  const migratedCookies = new TestCookieSession();
+  const migratedSession = await request(baseUrl, "/api/auth/session", {
+    token: legacySession.token,
+    cookieSession: migratedCookies,
+  });
+  assert.equal(migratedSession.session.authMode, "cookie");
+  assert.ok(migratedCookies.header());
+  await request(baseUrl, "/api/me", {
+    token: legacySession.token,
+    expectedStatus: 401,
+  });
+
+  const expiredSession = createSession(registered.user.id);
+  db.prepare("UPDATE sessions SET expires_at = ? WHERE id = ?")
+    .run("2000-01-01T00:00:00.000Z", expiredSession.id);
+  const expiredResponse = await request(baseUrl, "/api/me", {
+    token: expiredSession.token,
+    expectedStatus: 401,
+  });
+  assert.match(expiredResponse.error, /失效/);
 
   const malformedLogin = await request(baseUrl, "/api/auth/login", {
     method: "POST",
@@ -105,6 +207,22 @@ test("core study management API supports auth, sync, stats, and idempotent offli
     },
   });
   assert.equal(malformedLogin.error, "邮箱或密码不正确。");
+
+  const expiringCookies = new TestCookieSession();
+  await request(baseUrl, "/api/auth/login", {
+    method: "POST",
+    token: expiringCookies,
+    body: { email, password: "password123" },
+  });
+  const expiringToken = expiringCookies.cookies.get("tomato_session")
+    || expiringCookies.cookies.get("__Host-tomato_session");
+  db.prepare("UPDATE sessions SET expires_at = ? WHERE token_hash = ?")
+    .run("2000-01-01T00:00:00.000Z", hashToken(expiringToken));
+  await request(baseUrl, "/api/auth/session", {
+    token: expiringCookies,
+    expectedStatus: 401,
+  });
+  assert.equal(expiringCookies.header(), "");
 
   const invalidPassword = await request(baseUrl, "/api/auth/register", {
     method: "POST",
@@ -500,4 +618,24 @@ test("core study management API supports auth, sync, stats, and idempotent offli
   const syncedFocus = sync.focusSessions.find((session) => session.clientId === focusClientId);
   assert.equal(Boolean(syncedFocus), true);
   assert.equal(syncedFocus.studyGoalId, firstGoal.studyGoal.id);
+
+  const activeSessionToken = token.cookies.get("tomato_session")
+    || token.cookies.get("__Host-tomato_session");
+  assert.equal(
+    db.prepare("SELECT COUNT(*) AS count FROM sessions WHERE token_hash = ?")
+      .get(hashToken(activeSessionToken)).count,
+    1,
+  );
+  await request(baseUrl, "/api/auth/logout", {
+    method: "POST",
+    token,
+    expectedStatus: 204,
+  });
+  assert.equal(token.header(), "");
+  assert.equal(
+    db.prepare("SELECT COUNT(*) AS count FROM sessions WHERE token_hash = ?")
+      .get(hashToken(activeSessionToken)).count,
+    0,
+  );
+  await request(baseUrl, "/api/auth/session", { token, expectedStatus: 204 });
 });

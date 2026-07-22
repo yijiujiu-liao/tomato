@@ -34,14 +34,18 @@ function readBooleanEnv(name, fallback = false) {
   throw new Error(`${name} must be a boolean.`);
 }
 
+const nodeEnv = process.env.NODE_ENV || "development";
+const enforceHttps = readBooleanEnv("ENFORCE_HTTPS", false);
+
 export const config = Object.freeze({
-  nodeEnv: process.env.NODE_ENV || "development",
+  nodeEnv,
   platform: process.env.RENDER === "true" ? "render" : "self-managed",
   port: readIntegerEnv("PORT", 3000, 1, 65535),
   databasePath: resolve(process.env.DATABASE_PATH || "./data/tomato.sqlite"),
   sessionTtlDays: readIntegerEnv("SESSION_TTL_DAYS", 30, 1, 365),
   trustProxy: readBooleanEnv("TRUST_PROXY", false),
-  enforceHttps: readBooleanEnv("ENFORCE_HTTPS", false),
+  enforceHttps,
+  secureCookies: readBooleanEnv("SECURE_COOKIES", nodeEnv === "production" || enforceHttps),
   aiProvider: process.env.AI_PROVIDER === "deepseek" ? "deepseek" : "openai",
   openaiApiKey: process.env.OPENAI_API_KEY || "",
   openaiModel: process.env.OPENAI_MODEL || "gpt-5.5",

@@ -18,8 +18,10 @@ test("auth controller owns login mode, session persistence, and local access", a
       events.push(`auth:${mode}:${credentials.email}`);
       return {
         user: { id: "user-1", email: credentials.email },
-        token: "token-1",
-        expiresAt: "2026-08-01T00:00:00.000Z",
+        session: {
+          authMode: "cookie",
+          expiresAt: "2026-08-01T00:00:00.000Z",
+        },
       };
     },
     logout: async () => events.push("logout"),
@@ -44,8 +46,8 @@ test("auth controller owns login mode, session persistence, and local access", a
     displayName: "Student",
   }), true);
   assert.equal(controller.getState().localAccessGranted, false);
-  assert.equal(controller.getSession().token, "token-1");
-  assert.equal(JSON.parse(storage.getItem("auth")).session.token, "token-1");
+  assert.equal(controller.getSession().authMode, "cookie");
+  assert.equal(JSON.parse(storage.getItem("auth")).session.token, undefined);
   assert.ok(events.includes("sync:false"));
 
   controller.markSynced(new Date("2026-07-12T10:00:00.000Z"));
@@ -71,7 +73,9 @@ test("temporary sync failures keep a valid login session", async () => {
     sessionStorage: new MemoryStorage(),
     sessionKey: "auth",
     localAccessKey: "local",
-    getRepository: () => ({}),
+    getRepository: () => ({
+      getSession: async () => { throw new Error("service warming up"); },
+    }),
     performSync: async () => { throw new Error("service warming up"); },
     setFeedback: (message) => feedback.push(message),
   });
@@ -90,8 +94,9 @@ test("authentication failures clear an expired session", async () => {
     sessionStorage: new MemoryStorage(),
     sessionKey: "auth",
     localAccessKey: "local",
-    getRepository: () => ({}),
-    performSync: async () => { throw error; },
+    getRepository: () => ({
+      getSession: async () => { throw error; },
+    }),
   });
 
   assert.equal(await controller.bootstrap(), false);
@@ -109,8 +114,10 @@ test("successful login survives a temporary first sync failure", async () => {
     getRepository: () => ({
       authenticate: async () => ({
         user: { id: "user-1", email: "student@example.com" },
-        token: "token-1",
-        expiresAt: "2026-08-01T00:00:00.000Z",
+        session: {
+          authMode: "cookie",
+          expiresAt: "2026-08-01T00:00:00.000Z",
+        },
       }),
     }),
     performSync: async () => { throw new Error("temporary sync failure"); },
@@ -121,7 +128,29 @@ test("successful login survives a temporary first sync failure", async () => {
     password: "password123",
     displayName: "",
   }), true);
-  assert.equal(controller.getSession().token, "token-1");
+  assert.equal(controller.getSession().authMode, "cookie");
+});
+
+test("cookie session is restored on a browser cold start", async () => {
+  const storage = new MemoryStorage();
+  const controller = createAuthController({
+    storage,
+    sessionStorage: new MemoryStorage(),
+    sessionKey: "auth",
+    localAccessKey: "local",
+    getRepository: () => ({
+      getSession: async () => ({
+        user: { id: "user-1", email: "student@example.com" },
+        session: { authMode: "cookie", expiresAt: "2026-08-01T00:00:00.000Z" },
+      }),
+    }),
+    performSync: async () => {},
+  });
+
+  assert.equal(await controller.bootstrap(), true);
+  assert.equal(controller.isCloudEnabled(), true);
+  assert.equal(controller.getSession().authMode, "cookie");
+  assert.equal(JSON.parse(storage.getItem("auth")).session.token, undefined);
 });
 
 test("authentication rejects malformed passwords before calling the API", async () => {

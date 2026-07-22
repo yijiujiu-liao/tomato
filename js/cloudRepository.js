@@ -10,6 +10,9 @@ export function createCloudRepository(request) {
     logout() {
       return request("/api/auth/logout", { method: "POST" });
     },
+    getSession() {
+      return request("/api/auth/session");
+    },
     pullState() {
       return request("/api/sync");
     },

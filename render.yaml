@@ -17,6 +17,10 @@ services:
         value: /var/data/tomato.sqlite
       - key: SESSION_TTL_DAYS
         value: 30
+      - key: TRUST_PROXY
+        value: true
+      - key: SECURE_COOKIES
+        value: true
       - key: AI_PROVIDER
         value: deepseek
       - key: DEEPSEEK_MODEL

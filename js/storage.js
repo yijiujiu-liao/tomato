@@ -1,13 +1,14 @@
 export function loadAuthSession(storage, key) {
   const saved = readJson(storage, key, null);
 
-  if (!saved?.session?.token || !saved?.user) {
+  if (!saved?.user || (!saved?.session?.token && saved?.session?.authMode !== "cookie")) {
     return null;
   }
 
   return {
     user: saved.user,
     token: saved.session.token,
+    authMode: saved.session.authMode || (saved.session.token ? "bearer" : ""),
     expiresAt: saved.session.expiresAt,
     lastSyncedAt: typeof saved.lastSyncedAt === "string" ? saved.lastSyncedAt : ""
   };
@@ -22,6 +23,8 @@ export function saveAuthSession(storage, key, authSession) {
   const normalized = {
     user: authSession.user,
     token: authSession.token || authSession.session?.token,
+    authMode: authSession.authMode || authSession.session?.authMode
+      || (authSession.token || authSession.session?.token ? "bearer" : ""),
     expiresAt: authSession.expiresAt || authSession.session?.expiresAt,
     lastSyncedAt: authSession.lastSyncedAt || ""
   };
@@ -31,6 +34,7 @@ export function saveAuthSession(storage, key, authSession) {
     lastSyncedAt: normalized.lastSyncedAt,
     session: {
       token: normalized.token,
+      authMode: normalized.authMode,
       expiresAt: normalized.expiresAt
     }
   }));

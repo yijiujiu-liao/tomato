@@ -50,7 +50,7 @@ export function createOnboardingFlow({
 
   function ensureFirstRun() {
     const authState = authController.getState();
-    const hasAccess = authState.localAccessGranted || Boolean(authState.session?.token);
+    const hasAccess = authState.localAccessGranted || Boolean(authState.session?.user);
     if (!hasAccess || !petView || !longGoalView) return;
     const data = getData();
     if (!data.petChoiceCompleted) {
@@ -86,7 +86,7 @@ export function createOnboardingFlow({
 
   function ensureLongGoal() {
     const authState = authController.getState();
-    const hasAccess = authState.localAccessGranted || Boolean(authState.session?.token);
+    const hasAccess = authState.localAccessGranted || Boolean(authState.session?.user);
     if (!hasAccess || !longGoalView) return;
     const data = getData();
     if (getGoals().some((goal) => !goal.completed)) {

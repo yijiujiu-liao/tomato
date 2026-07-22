@@ -57,7 +57,11 @@ export function createAuthController({
   }
 
   function isAuthenticationFailure(error) {
-    return error?.status === 401 || error?.status === 403;
+    return error?.status === 401;
+  }
+
+  function hasCloudSession(value = session) {
+    return Boolean(value?.user && (value?.token || value?.authMode === "cookie"));
   }
 
   async function authenticate({ email, password, displayName }) {
@@ -109,7 +113,7 @@ export function createAuthController({
 
   async function logout() {
     try {
-      if (session?.token) await getRepository().logout();
+      if (hasCloudSession()) await getRepository().logout();
     } catch (error) {
       console.warn(error);
     }
@@ -121,7 +125,27 @@ export function createAuthController({
   }
 
   async function bootstrap() {
-    if (!session?.token) return;
+    if (!session && localAccessGranted) return false;
+    const hadPersistedSession = hasCloudSession();
+    try {
+      const restored = await getRepository().getSession();
+      if (!restored) return false;
+      session = saveAuthSession(storage, sessionKey, restored);
+      notify();
+    } catch (error) {
+      if (isAuthenticationFailure(error)) {
+        if (hadPersistedSession) {
+          setFeedback?.("登录已过期，请重新登录", true);
+          clearSession();
+        }
+        return false;
+      }
+
+      if (!hadPersistedSession) return false;
+      setFeedback?.("已保留登录状态，当前将以离线模式运行", true);
+      return false;
+    }
+
     try {
       await performSync?.("正在恢复云端同步...", { cloudFirst: true });
       return true;
@@ -132,7 +156,7 @@ export function createAuthController({
         return false;
       }
 
-      setFeedback?.("已保留登录状态，云端同步暂时不可用", true);
+      setFeedback?.("登录有效，云端同步暂时不可用，稍后会自动重试", true);
       return false;
     }
   }
@@ -153,7 +177,7 @@ export function createAuthController({
   return {
     getState,
     getSession: () => session,
-    isCloudEnabled: () => Boolean(session?.token),
+    isCloudEnabled: () => hasCloudSession(),
     setMode,
     enterLocal,
     authenticate,

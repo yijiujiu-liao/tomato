@@ -15,6 +15,7 @@ import {
   createUser,
   deleteSession,
   getUserByEmail,
+  refreshSessionCsrf,
   requireAuth,
   verifyPassword,
 } from "./auth.js";
@@ -111,6 +112,7 @@ export function createApp() {
     createUser,
     deleteSession,
     getUserByEmail,
+    refreshSessionCsrf,
     requireAuth,
     verifyPassword,
   });

@@ -34,7 +34,7 @@ export function createAuthGateView({ elements, onModeChange, onSubmit, onLocalEn
 
   return {
     render({ session, localAccessGranted, mode }) {
-      const isOpen = !session?.token && !localAccessGranted;
+      const isOpen = !session?.user && !localAccessGranted;
       root.hidden = !isOpen;
       root.inert = !isOpen;
       appRoot.inert = isOpen;
@@ -107,7 +107,7 @@ export function createAccountPanel({ mount, onToggle, onModeToggle, onSync, onSu
   let currentSession = null;
 
   accountToggle.addEventListener("click", () => {
-    if (currentSession?.token) {
+    if (currentSession?.user) {
       onToggle();
       return;
     }

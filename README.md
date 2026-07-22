@@ -48,6 +48,9 @@ NODE_ENV=production
 PORT=3000
 DATABASE_PATH=./data/tomato.sqlite
 SESSION_TTL_DAYS=30
+TRUST_PROXY=false
+ENFORCE_HTTPS=false
+SECURE_COOKIES=false
 AI_PROVIDER=openai
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5.5
@@ -63,6 +66,9 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com
 - `PORT`：后端监听端口，范围 `1-65535`。
 - `DATABASE_PATH`：SQLite 数据库文件位置。
 - `SESSION_TTL_DAYS`：登录会话有效天数，范围 `1-365`。
+- `TRUST_PROXY`：部署在 Render、Caddy 等反向代理后时设为 `true`，让服务端正确识别 HTTPS。
+- `ENFORCE_HTTPS`：开启后将 HTTP 读取请求重定向到 HTTPS，并拒绝不安全的写请求。
+- `SECURE_COOKIES`：生产环境默认开启；本地 HTTP 开发时设为 `false`。
 - `AI_PROVIDER`：AI 总结提供商，可选 `openai` 或 `deepseek`，默认 `openai`。
 - `OPENAI_API_KEY`：服务端调用 OpenAI 的密钥。不要写进前端代码，也不要提交到 Git。
 - `OPENAI_MODEL`：AI 总结使用的模型，默认 `gpt-5.5`。
@@ -73,17 +79,21 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com
 
 ## API 概览
 
-需要登录的 API 使用：
+浏览器注册或登录成功后，服务端会设置 `HttpOnly` 会话 Cookie；前端不会再把新会话令牌保存到 `localStorage`。写请求还会自动携带可读的 CSRF Cookie 值：
 
 ```http
-Authorization: Bearer <token>
+Cookie: __Host-tomato_session=<HttpOnly>; __Host-tomato_csrf=<token>
+X-CSRF-Token: <token>
 ```
+
+旧版本已经保存的 Bearer 会话仍可完成一次兼容验证，随后会自动换发 Cookie 会话并注销旧令牌。
 
 认证：
 
 - `POST /api/auth/register`
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
+- `GET /api/auth/session`
 - `GET /api/me`
 
 同步与设置：
@@ -137,6 +147,7 @@ AI 学习教练：
 ```bash
 SITE_ADDRESS=study.example.com
 ENFORCE_HTTPS=true
+SECURE_COOKIES=true
 SESSION_TTL_DAYS=30
 AI_PROVIDER=deepseek
 DEEPSEEK_API_KEY=你的服务端密钥
@@ -161,7 +172,7 @@ docker compose up -d --build
 docker image prune -f
 ```
 
-暂时没有域名时，可以设置 `SITE_ADDRESS=:80`、`ENFORCE_HTTPS=false` 通过 IP 访问；但正式给他人使用前应切换到 HTTPS，否则登录令牌、PWA 安装和浏览器安全能力都不适合长期使用。
+暂时没有域名时，可以设置 `SITE_ADDRESS=:80`、`ENFORCE_HTTPS=false`、`SECURE_COOKIES=false` 通过 IP 访问；这会降低会话安全性，只适合作为短期验收。正式给他人使用前必须切换到域名 HTTPS，并重新启用 Secure Cookie。
 
 ## Render 部署
 

@@ -103,7 +103,16 @@ test("auth and daily-plan storage retain the existing serialized contract", () =
   });
 
   assert.equal(normalized.token, "token-1");
+  assert.equal(normalized.authMode, "bearer");
   assert.deepEqual(loadAuthSession(storage, "auth"), normalized);
+
+  const cookieSession = saveAuthSession(storage, "auth", {
+    user: { id: "user-1" },
+    session: { authMode: "cookie", expiresAt: "tomorrow" },
+  });
+  assert.equal(cookieSession.authMode, "cookie");
+  assert.equal(cookieSession.token, undefined);
+  assert.equal(JSON.parse(storage.getItem("auth")).session.token, undefined);
 
   storage.setItem("plans", JSON.stringify({
     "2026-07-11": [{ title: "数学" }, null]

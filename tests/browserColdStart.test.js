@@ -33,6 +33,63 @@ test("browser cold starts, restores storage, updates PWA cache, reopens offline,
   assert.deepEqual(emptyErrors, []);
   await emptyContext.close();
 
+  const authContext = await browser.newContext();
+  const authPage = await authContext.newPage();
+  const authErrors = collectPageErrors(authPage);
+  await authPage.goto(`${baseUrl}/?cold=cookie-auth#/home`, { waitUntil: "networkidle" });
+  await authPage.locator("#gateRegisterTab").click();
+  await authPage.locator("#gateEmailInput").fill(`browser-${Date.now()}@example.com`);
+  await authPage.locator("#gatePasswordInput").fill("password123");
+  await authPage.locator("#gateNameInput").fill("冷启动同学");
+  await authPage.locator("#authGateSubmit").click();
+  await authPage.locator("#authGate").waitFor({ state: "hidden", timeout: 8_000 });
+
+  const browserCookies = await authContext.cookies(baseUrl);
+  const sessionCookie = browserCookies.find((cookie) => cookie.name.includes("tomato_session"));
+  const csrfCookie = browserCookies.find((cookie) => cookie.name.includes("tomato_csrf"));
+  assert.equal(sessionCookie.httpOnly, true);
+  assert.equal(sessionCookie.sameSite, "Lax");
+  assert.equal(csrfCookie.httpOnly, false);
+  assert.equal(await authPage.evaluate(() => document.cookie.includes("tomato_session")), false);
+  assert.equal(await authPage.evaluate(() => document.cookie.includes("tomato_csrf")), true);
+  const storedAuth = await authPage.evaluate(() => JSON.parse(localStorage.getItem("kaoyanPomodoroAuth")));
+  assert.equal(storedAuth.session.authMode, "cookie");
+  assert.equal(storedAuth.session.token, undefined);
+
+  const setupStatuses = await authPage.evaluate(async () => {
+    const csrf = document.cookie
+      .split(";")
+      .map((part) => part.trim())
+      .find((part) => part.includes("tomato_csrf="))
+      ?.split("=").slice(1).join("=") || "";
+    const headers = { "Content-Type": "application/json", "X-CSRF-Token": decodeURIComponent(csrf) };
+    const pet = await fetch("/api/pet", {
+      method: "PUT",
+      headers,
+      body: JSON.stringify({ petId: "penguin", choiceCompleted: true }),
+    });
+    const settings = await fetch("/api/settings", {
+      method: "PUT",
+      headers,
+      body: JSON.stringify({ longGoalOnboardingCompleted: true }),
+    });
+    return [pet.status, settings.status];
+  });
+  assert.deepEqual(setupStatuses, [200, 200]);
+
+  await authPage.reload({ waitUntil: "networkidle" });
+  assert.equal(await authPage.locator("#authGate").isVisible(), false);
+  assert.equal(await authPage.locator("#accountToggle").innerText(), "退出");
+  await authPage.evaluate(() => document.querySelector("#accountToggle").click());
+  await authPage.locator("#authGate").waitFor({ state: "visible", timeout: 8_000 });
+  assert.equal(await authPage.evaluate(() => localStorage.getItem("kaoyanPomodoroAuth")), null);
+  assert.equal((await authContext.cookies(baseUrl)).some((cookie) => cookie.name.includes("tomato_session")), false);
+  assert.deepEqual(
+    authErrors.filter((message) => !message.startsWith("Failed to load resource:")),
+    [],
+  );
+  await authContext.close();
+
   const restoredContext = await browser.newContext();
   await restoredContext.addInitScript(seedExistingStudyState, createSeedData());
   const restoredPage = await restoredContext.newPage();
@@ -65,7 +122,7 @@ test("browser cold starts, restores storage, updates PWA cache, reopens offline,
   await restoredPage.evaluate(() => navigator.serviceWorker.ready);
   await waitFor(async () => restoredPage.evaluate(async () => {
     const keys = await caches.keys();
-    return keys.includes("kaoyan-pomodoro-v79")
+    return keys.includes("kaoyan-pomodoro-v80")
       && !keys.includes("kaoyan-pomodoro-old-test-cache");
   }));
   await restoredPage.reload({ waitUntil: "networkidle" });

@@ -56,14 +56,28 @@ function listen() {
 }
 
 async function request(baseUrl, path, { method = "GET", token, body } = {}) {
+  const auth = token && typeof token === "object" ? token : null;
   const response = await nativeFetch(`${baseUrl}${path}`, {
     method,
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(typeof token === "string" ? { Authorization: `Bearer ${token}` } : {}),
+      ...(auth?.cookie ? { Cookie: auth.cookie } : {}),
+      ...(["POST", "PUT", "PATCH", "DELETE"].includes(method) && auth?.csrf
+        ? { "X-CSRF-Token": auth.csrf }
+        : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
   });
+  if (auth) {
+    const cookies = response.headers.getSetCookie().map((value) => value.split(";")[0]);
+    if (cookies.length) {
+      auth.cookie = cookies.join("; ");
+      auth.csrf = cookies
+        .find((value) => /tomato_csrf=/.test(value))
+        ?.split("=").slice(1).join("=") || auth.csrf;
+    }
+  }
   const payload = await response.json();
   assert.equal(response.ok, true, payload.error || `${method} ${path} failed`);
   return payload;
@@ -77,16 +91,16 @@ test("AI HTTP loop generates, caches, refreshes, and restores an execution revie
   });
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
   const dateKey = "2026-07-13";
+  const token = { cookie: "", csrf: "" };
   const registered = await request(baseUrl, "/api/auth/register", {
     method: "POST",
+    token,
     body: {
       email: `ai-loop-${Date.now()}@example.com`,
       password: "password123",
       displayName: "AI 闭环测试",
     },
   });
-  const token = registered.session.token;
-
   const mathTask = await request(baseUrl, "/api/tasks", {
     method: "POST",
     token,
