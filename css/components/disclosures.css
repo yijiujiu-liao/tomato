@@ -1,0 +1,32 @@
+.pet-picker-disclosure,
+.diagnosis-details,
+.review-records-disclosure,
+.stats-heatmap-wrap {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--soft);
+}
+
+.pet-picker-disclosure summary,
+.diagnosis-details summary,
+.review-records-disclosure > summary,
+.stats-heatmap-wrap > summary {
+  min-height: 44px;
+  padding: 12px 13px;
+  color: var(--brand-dark);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+  list-style: none;
+}
+
+.pet-picker-disclosure summary::-webkit-details-marker,
+.diagnosis-details summary::-webkit-details-marker,
+.review-records-disclosure > summary::-webkit-details-marker,
+.stats-heatmap-wrap > summary::-webkit-details-marker {
+  display: none;
+}
+
+.pet-picker-disclosure .pet-picker {
+  padding: 0 10px 10px;
+}

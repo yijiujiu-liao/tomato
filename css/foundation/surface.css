@@ -1,0 +1,80 @@
+/* Refined app surface: quieter hierarchy, fewer decorative containers. */
+body {
+  font-family: "Microsoft YaHei UI", "Noto Sans SC", sans-serif;
+}
+
+.app {
+  width: min(100%, 460px);
+  padding-inline: 14px;
+}
+
+.hero {
+  padding: 3px 1px 8px;
+}
+
+body:not([data-page="home"]) .hero {
+  display: block;
+}
+
+body:not([data-page="home"]) .app {
+  padding-top: 7px;
+}
+
+.top-bar {
+  justify-content: space-between;
+  min-height: 38px;
+  margin: 0;
+}
+
+.app-wordmark {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 850;
+  letter-spacing: -0.02em;
+}
+
+.top-actions {
+  display: flex;
+  gap: 7px;
+}
+
+.settings-open-btn {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  color: var(--brand-dark);
+  background: var(--card-bg);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.card,
+.stat-card {
+  border-radius: 14px;
+  background: var(--card-bg);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.card {
+  border-color: var(--line);
+}
+
+.page-kicker,
+.stats-kicker {
+  display: none !important;
+}
+
+.page-intro {
+  min-height: 44px;
+  margin: 0 0 8px;
+  padding: 0 2px;
+}
+
+.page-intro h2,
+body:not([data-page="home"]) .app-page.active .page-intro h2 {
+  font-size: 22px;
+  font-weight: 850;
+  letter-spacing: -0.04em;
+}

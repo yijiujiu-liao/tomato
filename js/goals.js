@@ -28,7 +28,10 @@ export function normalizeStudyGoal(goal) {
     completed: Boolean(goal.completed),
     createdAt: typeof goal.createdAt === "string" ? goal.createdAt : new Date().toISOString(),
     completedAt: goal.completed && typeof goal.completedAt === "string" ? goal.completedAt : null,
-    updatedAt: typeof goal.updatedAt === "string" ? goal.updatedAt : new Date().toISOString()
+    updatedAt: typeof goal.updatedAt === "string" ? goal.updatedAt : new Date().toISOString(),
+    serverUpdatedAt: typeof goal.serverUpdatedAt === "string"
+      ? goal.serverUpdatedAt
+      : (syncedGoalId && typeof goal.updatedAt === "string" ? goal.updatedAt : "")
   };
 }
 

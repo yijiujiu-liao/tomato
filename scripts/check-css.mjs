@@ -1,18 +1,11 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const files = [
-  "style.css",
-  "css/theme.css",
-  "css/base.css",
-  "css/layout.css",
-  "css/components.css",
-  "css/pages.css",
-  "css/overlays.css",
-  "css/responsive.css",
-  "css/refinements.css",
-  "css/focus-session.css",
-];
+const entryFile = "style.css";
+const entrySource = readFileSync(resolve(entryFile), "utf8");
+const importedFiles = [...entrySource.matchAll(/@import\s+url\(["']?([^"')]+)["']?\)/g)]
+  .map((match) => match[1].replace(/^\.\//, ""));
+const files = [entryFile, ...importedFiles];
 
 for (const file of files) {
   const source = readFileSync(resolve(file), "utf8");

@@ -474,11 +474,26 @@
     </nav>
   </main>
 
+  <div class="pet-choice-onboarding" id="petChoiceOnboarding" aria-hidden="true" inert hidden>
+    <section class="pet-choice-onboarding-card" role="dialog" aria-modal="true" aria-labelledby="petChoiceOnboardingTitle">
+      <div class="pet-choice-onboarding-progress">
+        <span aria-hidden="true"><i></i><i></i></span>
+        <small>首次设置 · 第 1 步，共 2 步</small>
+      </div>
+      <p class="page-kicker">Choose Your Companion</p>
+      <h2 id="petChoiceOnboardingTitle">选择一起备考的伙伴</h2>
+      <p class="pet-choice-onboarding-lead">它会陪你专注、庆祝完成，也会记住你走过的每一天。</p>
+      <div class="pet-onboarding-choices" id="petOnboardingChoices" role="radiogroup" aria-label="选择宠物"></div>
+      <p class="pet-choice-onboarding-note">伙伴能力和成长速度完全相同，选你最喜欢的就好。</p>
+      <button class="primary-btn pet-onboarding-confirm" id="petOnboardingConfirm" type="button" disabled>先选择一位伙伴</button>
+    </section>
+  </div>
+
   <div class="long-goal-onboarding" id="longGoalOnboarding" aria-hidden="true" inert hidden>
     <section class="long-goal-onboarding-card" role="dialog" aria-modal="true" aria-labelledby="longGoalOnboardingTitle">
       <div class="long-goal-onboarding-progress" aria-label="首次设置，第 1 步，共 1 步">
         <span></span>
-        <small>首次设置 · 约 1 分钟</small>
+        <small>首次设置 · 第 2 步，共 2 步</small>
       </div>
       <p class="page-kicker">Your Direction</p>
       <h2 id="longGoalOnboardingTitle">先确定你为什么而学</h2>

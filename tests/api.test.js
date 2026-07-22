@@ -70,6 +70,13 @@ test("core study management API supports auth, sync, stats, and idempotent offli
     assert.ok((await response.text()).length > 20);
   }
 
+  for (const modulePath of ["/script.js", "/application.js", "/js/app/dom.js"]) {
+    const response = await fetch(`${baseUrl}${modulePath}`);
+    assert.equal(response.status, 200, `${modulePath} must be publicly available`);
+    assert.match(response.headers.get("content-type") || "", /javascript/);
+    assert.ok((await response.text()).length > 10);
+  }
+
   for (const privatePath of ["/data/tomato.sqlite", "/data/tomato.sqlite-wal", "/server/index.js", "/tests/api.test.js", "/package.json"]) {
     const response = await fetch(`${baseUrl}${privatePath}`);
     assert.equal(response.status, 404, `${privatePath} must not be publicly downloadable`);
@@ -226,6 +233,39 @@ test("core study management API supports auth, sync, stats, and idempotent offli
   });
   assert.equal(linkedTask.task.studyGoalId, firstGoal.studyGoal.id);
 
+  const staleTaskConflict = await request(baseUrl, `/api/tasks/${firstTask.task.id}`, {
+    method: "PATCH",
+    token,
+    expectedStatus: 409,
+    body: { title: "陈旧设备写入", expectedUpdatedAt: "stale-task-version" },
+  });
+  assert.equal(staleTaskConflict.code, "TASK_VERSION_CONFLICT");
+  assert.equal(staleTaskConflict.task.updatedAt, linkedTask.task.updatedAt);
+
+  const staleGoalConflict = await request(baseUrl, `/api/study-goals/${firstGoal.studyGoal.id}`, {
+    method: "PATCH",
+    token,
+    expectedStatus: 409,
+    body: { title: "陈旧目标写入", expectedUpdatedAt: "stale-goal-version" },
+  });
+  assert.equal(staleGoalConflict.code, "GOAL_VERSION_CONFLICT");
+  assert.equal(staleGoalConflict.studyGoal.updatedAt, completedGoal.studyGoal.updatedAt);
+
+  const initialSettings = await request(baseUrl, "/api/settings", { token });
+  const updatedSettings = await request(baseUrl, "/api/settings", {
+    method: "PUT",
+    token,
+    body: { dailyGoal: 9, expectedUpdatedAt: initialSettings.settings.updatedAt },
+  });
+  const staleSettingsConflict = await request(baseUrl, "/api/settings", {
+    method: "PUT",
+    token,
+    expectedStatus: 409,
+    body: { dailyGoal: 10, expectedUpdatedAt: "stale-settings-version" },
+  });
+  assert.equal(staleSettingsConflict.code, "SETTINGS_VERSION_CONFLICT");
+  assert.equal(staleSettingsConflict.settings.updatedAt, updatedSettings.settings.updatedAt);
+
   const focusClientId = `focus-${stamp}`;
   const endedAt = new Date().toISOString();
   const todayDateKey = endedAt.slice(0, 10);
@@ -323,6 +363,7 @@ test("core study management API supports auth, sync, stats, and idempotent offli
     }
   });
   const initialPet = await request(baseUrl, "/api/pet", { token });
+  assert.equal(initialPet.pet.choiceCompleted, false);
   const updatedPet = await request(baseUrl, "/api/pet", {
     method: "PUT",
     token,
@@ -331,6 +372,7 @@ test("core study management API supports auth, sync, stats, and idempotent offli
       level: 3,
       currentXP: 40,
       totalXP: 240,
+      choiceCompleted: true,
       updatedAt: initialPet.pet.updatedAt
     }
   });
@@ -347,6 +389,7 @@ test("core study management API supports auth, sync, stats, and idempotent offli
     }
   });
   assert.equal(updatedPet.pet.totalXP, 290);
+  assert.equal(updatedPet.pet.choiceCompleted, true);
   assert.equal(petConflict.code, "PET_VERSION_CONFLICT");
 
   const repairedPet = await request(baseUrl, "/api/pet", {
@@ -363,6 +406,7 @@ test("core study management API supports auth, sync, stats, and idempotent offli
   assert.equal(repairedPet.pet.level, 3);
   assert.equal(repairedPet.pet.currentXP, 40);
   assert.equal(repairedPet.pet.totalXP, 290);
+  assert.equal(repairedPet.pet.choiceCompleted, true);
 
   const stats = await request(baseUrl, "/api/stats?range=week", { token });
   assert.equal(stats.days.length, 7);

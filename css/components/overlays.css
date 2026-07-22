@@ -9,6 +9,242 @@
   }
 }
 
+.pet-choice-onboarding {
+  position: fixed;
+  inset: 0;
+  z-index: 1650;
+  display: grid;
+  place-items: center;
+  padding: max(18px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom));
+  overflow-y: auto;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(240, 157, 76, 0.16), transparent 32%),
+    radial-gradient(circle at 90% 18%, rgba(87, 151, 137, 0.18), transparent 34%),
+    rgba(246, 243, 234, 0.96);
+  backdrop-filter: blur(18px);
+}
+
+.pet-choice-onboarding[hidden] {
+  display: none;
+}
+
+.pet-choice-onboarding-card {
+  width: min(100%, 680px);
+  padding: 28px;
+  border: 1px solid rgba(30, 72, 64, 0.13);
+  border-radius: 30px;
+  background: rgba(255, 253, 247, 0.97);
+  box-shadow: 0 30px 100px rgba(37, 69, 61, 0.18);
+}
+
+.pet-choice-onboarding-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  color: var(--muted);
+}
+
+.pet-choice-onboarding-progress > span {
+  display: grid;
+  grid-template-columns: repeat(2, 26px);
+  gap: 4px;
+}
+
+.pet-choice-onboarding-progress i {
+  height: 4px;
+  border-radius: 99px;
+  background: rgba(37, 99, 90, 0.16);
+}
+
+.pet-choice-onboarding-progress i:first-child {
+  background: var(--primary);
+}
+
+.pet-choice-onboarding-card h2 {
+  margin: 5px 0 8px;
+  font-size: clamp(28px, 6vw, 38px);
+  letter-spacing: -0.04em;
+}
+
+.pet-choice-onboarding-lead {
+  margin: 0 0 20px;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.pet-onboarding-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pet-onboarding-choice {
+  position: relative;
+  display: grid;
+  grid-template-columns: 94px minmax(0, 1fr);
+  align-items: center;
+  min-height: 126px;
+  padding: 12px 34px 12px 10px;
+  overflow: hidden;
+  border: 1px solid rgba(30, 72, 64, 0.12);
+  border-radius: 21px;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 20% 25%, color-mix(in srgb, var(--pet-onboarding-accent) 24%, transparent), transparent 48%),
+    rgba(255, 255, 255, 0.72);
+  text-align: left;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.pet-onboarding-choice:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--pet-onboarding-accent) 70%, var(--primary));
+}
+
+.pet-onboarding-choice[aria-checked="true"] {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 90, 0.11), 0 14px 30px rgba(37, 69, 61, 0.1);
+}
+
+.pet-onboarding-art,
+.pet-onboarding-art .pet-activity-sprite {
+  width: 90px;
+  height: 90px;
+}
+
+.pet-onboarding-art .pet-activity-sprite {
+  --pet-strip-width: 5760px;
+}
+
+.pet-onboarding-choice[aria-checked="true"] .pet-activity-sprite {
+  animation: petFramesWalk 2.56s steps(64, end) 1;
+}
+
+.pet-onboarding-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.pet-onboarding-copy strong {
+  font-size: 17px;
+  letter-spacing: -0.02em;
+}
+
+.pet-onboarding-copy small {
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.pet-onboarding-copy > span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.pet-onboarding-check {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: transparent;
+  background: rgba(37, 99, 90, 0.08);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.pet-onboarding-choice[aria-checked="true"] .pet-onboarding-check {
+  color: white;
+  background: var(--primary);
+}
+
+.pet-choice-onboarding-note {
+  margin: 14px 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.pet-onboarding-confirm {
+  width: 100%;
+  min-height: 54px;
+}
+
+body.pet-onboarding-active,
+body.long-goal-onboarding-active {
+  overflow: hidden;
+}
+
+body.dark .pet-choice-onboarding {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(240, 157, 76, 0.1), transparent 32%),
+    radial-gradient(circle at 90% 18%, rgba(87, 151, 137, 0.14), transparent 34%),
+    rgba(16, 28, 26, 0.97);
+}
+
+body.dark .pet-choice-onboarding-card {
+  border-color: rgba(231, 238, 226, 0.12);
+  background: #172521;
+}
+
+body.dark .pet-onboarding-choice {
+  border-color: rgba(231, 238, 226, 0.12);
+  background:
+    radial-gradient(circle at 20% 25%, color-mix(in srgb, var(--pet-onboarding-accent) 18%, transparent), transparent 48%),
+    rgba(16, 28, 25, 0.74);
+}
+
+@media (max-width: 580px) {
+  .pet-choice-onboarding {
+    align-items: end;
+    padding: 0;
+  }
+
+  .pet-choice-onboarding-card {
+    max-height: 100dvh;
+    padding: 22px 16px max(22px, env(safe-area-inset-bottom));
+    overflow-y: auto;
+    border-radius: 28px 28px 0 0;
+  }
+
+  .pet-choice-onboarding-progress {
+    margin-bottom: 14px;
+  }
+
+  .pet-choice-onboarding-lead {
+    margin-bottom: 14px;
+    font-size: 14px;
+  }
+
+  .pet-onboarding-choices {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .pet-onboarding-choice {
+    grid-template-columns: 76px minmax(0, 1fr);
+    min-height: 94px;
+    padding-block: 7px;
+  }
+
+  .pet-onboarding-art,
+  .pet-onboarding-art .pet-activity-sprite {
+    width: 76px;
+    height: 76px;
+  }
+
+  .pet-onboarding-art .pet-activity-sprite {
+    --pet-strip-width: 4864px;
+  }
+}
+
 .long-goal-onboarding {
   position: fixed;
   inset: 0;

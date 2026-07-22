@@ -90,9 +90,10 @@ export function createTaskController({
     }
     savePlans();
     refresh();
+    syncController.cancelTask?.(task);
     if (task.syncedTaskId) {
       taskStore.rememberDeleted(task.syncedTaskId);
-      runCloudSync(() => syncController.deleteTask(task.syncedTaskId));
+      runCloudSync(() => syncController.deleteTask(task.syncedTaskId, task));
     }
     return true;
   }
@@ -177,7 +178,8 @@ export function createTaskController({
     showToast("已延期到明天。");
     if (result.task.syncedTaskId) taskStore.rememberDeleted(result.task.syncedTaskId);
     runCloudSync(async () => {
-      if (result.task.syncedTaskId) await syncController.deleteTask(result.task.syncedTaskId);
+      syncController.cancelTask?.(result.task);
+      if (result.task.syncedTaskId) await syncController.deleteTask(result.task.syncedTaskId, result.task);
       if (result.delayedTask) {
         const created = await syncController.createTask(result.delayedTask, tomorrowKey);
         syncController.applyCreatedTask(result.delayedTask, created.task);

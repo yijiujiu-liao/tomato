@@ -44,8 +44,9 @@ test("cloud state applier normalizes remote settings, pet, tasks, and focus coun
   applier.settings({ focusDuration: 45, dailyGoal: 10, theme: "dark", nextRestType: "long" });
   assert.equal(data.focusDuration, 45);
   assert.equal(engine.remaining, 2700);
-  applier.pet({ petId: "penguin", level: 1, currentXP: 20, totalXP: 20 });
+  applier.pet({ petId: "penguin", level: 1, currentXP: 20, totalXP: 20, choiceCompleted: true });
   assert.equal(data.todayPetXP, 20);
+  assert.equal(data.petChoiceCompleted, true);
   applier.tasks([{ id: "cloud-task", clientId: "local-task", title: "数学", dateKey: "2026-07-12" }]);
   assert.equal(taskStore.getTasks("2026-07-12").length, 1);
   applier.focusSessions([{ id: "focus-cloud", clientId: "focus-local", mode: "focus", taskTitle: "数学", minutes: 45, streak: 1, dateKey: "2026-07-12", endedAt: "2026-07-12T10:00:00Z" }]);

@@ -20,11 +20,13 @@ export function createApiClient({ getToken }) {
     if (!response.ok) {
       let message = "请求失败";
       let code = "";
+      let details = null;
 
       try {
         const payload = await response.json();
         message = payload.error || message;
         code = payload.code || "";
+        details = payload;
       } catch (error) {
         message = response.statusText || message;
       }
@@ -32,6 +34,7 @@ export function createApiClient({ getToken }) {
       const requestError = new Error(message);
       requestError.status = response.status;
       requestError.code = code;
+      requestError.details = details;
       throw requestError;
     }
 

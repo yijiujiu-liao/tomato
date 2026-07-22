@@ -1,0 +1,155 @@
+.ai-summary-card,
+.review-card,
+.study-diagnosis-card,
+.cloud-stats-card {
+  padding: 15px;
+  border-radius: 14px;
+}
+
+.review-grid {
+  grid-template-columns: 1fr;
+}
+
+.review-grid article {
+  padding: 11px;
+  border-radius: 10px;
+}
+
+.review-records-disclosure {
+  margin-top: 10px;
+  background: var(--card-bg);
+}
+
+.review-card[hidden] {
+  display: none;
+}
+
+.review-records-disclosure .records-card {
+  margin: 0;
+  padding-top: 0;
+  border: 0;
+}
+
+.review-records-disclosure .records-card .section-title {
+  display: none;
+}
+
+.diagnosis-details,
+.stats-heatmap-wrap {
+  margin-top: 10px;
+  background: transparent;
+}
+
+.diagnosis-list,
+.stats-heatmap {
+  padding: 0 10px 10px;
+}
+
+.diagnosis-lead {
+  display: grid;
+  gap: 5px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: 12px;
+  background: var(--soft);
+}
+
+.diagnosis-lead[data-level="good"] {
+  border-left-color: var(--brand);
+}
+
+.diagnosis-lead[data-level="bad"] {
+  border-left-color: #b4523b;
+}
+
+.diagnosis-lead > span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.diagnosis-lead strong {
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 850;
+  line-height: 1.35;
+}
+
+.diagnosis-lead p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.55;
+}
+
+.diagnosis-chip {
+  display: none;
+}
+
+.stats-heatmap-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cloud-stats-summary article,
+.stat-card {
+  border-radius: 12px;
+}
+
+.cloud-stats-summary-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 46px;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 800;
+  list-style: none;
+}
+
+.cloud-stats-summary-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.cloud-stats-summary-toggle small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.cloud-stats-content {
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.ai-summary-card[data-mode="local"] {
+  gap: 10px;
+  background: var(--card-bg);
+}
+
+.ai-summary-card[data-mode="local"] .ai-summary-hint {
+  margin-top: -2px;
+}
+
+.ai-summary-card[data-mode="local"] .ai-summary-empty {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 11px;
+  padding: 12px;
+  border-style: solid;
+  border-radius: 12px;
+  background: var(--soft);
+}
+
+.ai-summary-card[data-mode="local"] .ai-summary-empty p {
+  margin: 0;
+}
+
+.ai-summary-card[data-mode="local"] .ai-summary-login {
+  width: 100%;
+}

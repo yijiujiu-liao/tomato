@@ -33,6 +33,7 @@ export function createCloudStateApplier({
     data.longGoalOnboardingCompleted = Boolean(
       settingsValue.longGoalOnboardingCompleted || data.longGoalOnboardingCompleted
     );
+    data.settingsUpdatedAt = typeof settingsValue.updatedAt === "string" ? settingsValue.updatedAt : "";
     modes.focus.minutes = data.focusDuration;
     modes.rest.minutes = getRestMinutes();
     if (timerEngine.getState().mode === "focus" && !timerEngine.isRunning()) {
@@ -50,6 +51,7 @@ export function createCloudStateApplier({
     const data = getData();
     const petId = normalizePetType(petValue.petId);
     data.selectedPet = petId;
+    data.petChoiceCompleted = Boolean(petValue.choiceCompleted || data.petChoiceCompleted);
     data.petProgress = normalizePetProgress({
       petId,
       level: petValue.level,

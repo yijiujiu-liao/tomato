@@ -22,10 +22,12 @@ export function createTodayStore({ storage, key, getDateKey }) {
       currentTaskId: "",
       currentStudyGoalId: "",
       longGoalOnboardingCompleted: false,
+      settingsUpdatedAt: "",
       dailyGoal: DEFAULT_GOAL,
       focusDuration: DEFAULT_FOCUS_MINUTES,
       nextRestType: "short",
       theme: "light",
+      petChoiceCompleted: false,
       records: [],
       todayPetXP: 0,
       selectedPet,
@@ -51,7 +53,9 @@ export function createTodayStore({ storage, key, getDateKey }) {
           selectedPet,
           petProgress,
           activeTimer: normalizeActiveTimer(saved.activeTimer),
+          petChoiceCompleted: Boolean(saved.petChoiceCompleted),
           longGoalOnboardingCompleted: Boolean(saved.longGoalOnboardingCompleted),
+          settingsUpdatedAt: typeof saved.settingsUpdatedAt === "string" ? saved.settingsUpdatedAt : "",
         };
       }
       return {
@@ -60,7 +64,9 @@ export function createTodayStore({ storage, key, getDateKey }) {
         streak: normalizeNonNegativeInteger(saved.streak),
         currentTaskId: typeof saved.currentTaskId === "string" ? saved.currentTaskId : "",
         currentStudyGoalId: typeof saved.currentStudyGoalId === "string" ? saved.currentStudyGoalId : "",
+        petChoiceCompleted: Boolean(saved.petChoiceCompleted),
         longGoalOnboardingCompleted: Boolean(saved.longGoalOnboardingCompleted),
+        settingsUpdatedAt: typeof saved.settingsUpdatedAt === "string" ? saved.settingsUpdatedAt : "",
         dailyGoal: normalizeGoal(saved.dailyGoal),
         focusDuration: normalizeFocusDuration(saved.focusDuration),
         nextRestType: normalizeRestType(saved.nextRestType),

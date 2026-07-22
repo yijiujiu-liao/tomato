@@ -8,6 +8,7 @@
     "dev": "node --env-file-if-exists=.env --watch server/index.js",
     "backup": "node --env-file-if-exists=.env scripts/backup-database.mjs",
     "check": "node scripts/check-syntax.mjs && node scripts/check-css.mjs",
+    "test:browser": "node --test tests/browserColdStart.test.js",
     "seed:demo": "node scripts/seed-demo-data.mjs",
     "test": "node --test"
   },
@@ -16,5 +17,8 @@
   },
   "engines": {
     "node": ">=24.0.0"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.55.0"
   }
 }

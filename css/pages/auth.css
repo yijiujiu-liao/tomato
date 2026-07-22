@@ -1,0 +1,17 @@
+.auth-gate {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(239, 141, 67, 0.12), transparent 34%),
+    var(--bg);
+}
+
+.auth-gate-orbit,
+.auth-gate-benefits {
+  display: none;
+}
+
+.auth-gate-card {
+  border-radius: 20px;
+  background: var(--card-bg);
+  box-shadow: 0 14px 40px rgba(32, 49, 46, 0.11);
+  backdrop-filter: none;
+}

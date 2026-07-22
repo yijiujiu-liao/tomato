@@ -45,3 +45,6 @@ export function inferTodayPetXP(records) {
 export function normalizeTodayPetXP(value, totalXP = 0) {
   return Math.min(normalizeNonNegativeInteger(value), normalizeNonNegativeInteger(totalXP));
 }
+
+export const inferTodayXP = inferTodayPetXP;
+export const normalizeTodayXP = normalizeTodayPetXP;

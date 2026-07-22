@@ -158,8 +158,9 @@ export function createGoalController({
     saveGoals();
     renderGoals();
     updateOptions();
+    syncController.cancelStudyGoal?.(goal);
     if (goal.syncedGoalId) {
-      runCloudSync(() => syncController.deleteStudyGoal(goal.syncedGoalId));
+      runCloudSync(() => syncController.deleteStudyGoal(goal.syncedGoalId, goal));
     }
     return true;
   }

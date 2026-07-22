@@ -14,6 +14,7 @@ export const DAILY_PLANS_KEY = "kaoyanDailyPlans";
 export const AUTH_SESSION_KEY = "kaoyanPomodoroAuth";
 export const STUDY_GOALS_KEY = "kaoyanStudyGoals";
 export const DELETED_TASKS_KEY = "kaoyanDeletedCloudTasks";
+export const SYNC_OUTBOX_KEY = "kaoyanSyncOutboxV1";
 export const DEFAULT_GOAL = 8;
 export const DEFAULT_FOCUS_MINUTES = 50;
 export const MIN_FOCUS_MINUTES = 1;
@@ -33,12 +34,16 @@ export const STATS_RANGES = {
 export const PET_TYPES = {
   penguin: {
     name: "蓝莓企鹅",
+    role: "温柔陪伴",
+    promise: "慢一点也没关系，我会陪你把今天走完。",
     src: "assets/pets/penguin-v2.png",
     walkSrc: "/assets/pets/penguin-walk-v5.webp",
     accent: "#9fc7ea"
   },
   purpleDragon: {
     name: "紫晶小龙",
+    role: "勇敢行动",
+    promise: "最难的那一步，我们现在就一起迈出去。",
     src: "assets/pets/purple-dragon-v2.png",
     walkSrc: "/assets/pets/purple-dragon-walk-v5.webp",
     walkScale: 1.2,
@@ -46,12 +51,16 @@ export const PET_TYPES = {
   },
   greenDino: {
     name: "青叶恐龙",
+    role: "稳定守护",
+    promise: "不用追赶别人，守住自己的节奏就很好。",
     src: "assets/pets/green-dino-v2.png",
     walkSrc: "/assets/pets/green-dino-walk-v5.webp",
     accent: "#94bd55"
   },
   chick: {
     name: "奶油小鸡",
+    role: "元气鼓励",
+    promise: "完成一个目标，就值得认真庆祝一次。",
     src: "assets/pets/chick-v2.png",
     walkSrc: "/assets/pets/chick-walk-v5.webp",
     accent: "#f3c34a"

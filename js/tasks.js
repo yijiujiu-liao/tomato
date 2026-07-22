@@ -21,6 +21,9 @@ export function normalizeTask(task) {
     completed: Boolean(task.completed),
     createdAt: typeof task.createdAt === "string" ? task.createdAt : new Date().toISOString(),
     completedAt: task.completed && typeof task.completedAt === "string" ? task.completedAt : null,
+    serverUpdatedAt: typeof task.serverUpdatedAt === "string"
+      ? task.serverUpdatedAt
+      : (syncedTaskId && typeof task.updatedAt === "string" ? task.updatedAt : ""),
     xpEarned: normalizeNonNegativeInteger(task.xpEarned),
     carriedFromId: typeof task.carriedFromId === "string" ? task.carriedFromId : undefined,
     source: normalizeTaskSource(task.source),
@@ -171,4 +174,34 @@ export function delayTask({ store, fromDateKey, toDateKey, taskId, createId, now
   });
   if (delayedTask) store.addTask(toDateKey, delayedTask);
   return { task, delayedTask };
+}
+
+export function sortTasks(tasks, currentTaskId = "") {
+  return [...tasks].sort((first, second) => {
+    const firstCurrent = first.id === currentTaskId;
+    const secondCurrent = second.id === currentTaskId;
+    if (firstCurrent !== secondCurrent) {
+      return firstCurrent ? -1 : 1;
+    }
+    const firstAdopted = first.source === "ai";
+    const secondAdopted = second.source === "ai";
+    if (firstAdopted !== secondAdopted) {
+      return firstAdopted ? -1 : 1;
+    }
+    return new Date(first.createdAt) - new Date(second.createdAt);
+  });
+}
+
+export function resolveCurrentTask(tasks, currentTaskId = "") {
+  const available = sortTasks(
+    tasks.filter((task) => !task.completed),
+    currentTaskId,
+  );
+  const task = available.find((item) => item.id === currentTaskId)
+    || available[0]
+    || null;
+  return {
+    task,
+    changed: (task?.id || "") !== currentTaskId,
+  };
 }

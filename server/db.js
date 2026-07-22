@@ -48,6 +48,7 @@ db.exec(`
     next_level_xp INTEGER NOT NULL DEFAULT 100,
     total_xp INTEGER NOT NULL DEFAULT 0,
     evolution_stage INTEGER NOT NULL DEFAULT 1,
+    pet_choice_completed INTEGER NOT NULL DEFAULT 0,
     updated_at TEXT NOT NULL
   );
 
@@ -126,6 +127,11 @@ db.exec(`
 const focusSessionColumns = db.prepare("PRAGMA table_info(focus_sessions)").all().map((column) => column.name);
 const taskColumns = db.prepare("PRAGMA table_info(tasks)").all().map((column) => column.name);
 const userSettingsColumns = db.prepare("PRAGMA table_info(user_settings)").all().map((column) => column.name);
+const petColumns = db.prepare("PRAGMA table_info(pets)").all().map((column) => column.name);
+
+if (!petColumns.includes("pet_choice_completed")) {
+  db.exec("ALTER TABLE pets ADD COLUMN pet_choice_completed INTEGER NOT NULL DEFAULT 0");
+}
 
 if (!userSettingsColumns.includes("current_study_goal_id")) {
   db.exec("ALTER TABLE user_settings ADD COLUMN current_study_goal_id TEXT");
@@ -362,6 +368,7 @@ export function petFromRow(row) {
     nextLevelXP: row.next_level_xp,
     totalXP: row.total_xp,
     evolutionStage: row.evolution_stage,
+    choiceCompleted: toBoolean(row.pet_choice_completed),
     updatedAt: row.updated_at
   };
 }

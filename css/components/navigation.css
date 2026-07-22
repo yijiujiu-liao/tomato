@@ -1,0 +1,29 @@
+.bottom-nav {
+  width: min(calc(100% - 28px), 432px);
+  padding: 4px;
+  border-radius: 15px;
+  background: var(--card-bg);
+  box-shadow: 0 8px 24px rgba(32, 49, 46, 0.1);
+  backdrop-filter: none;
+}
+
+.nav-btn {
+  min-height: 48px;
+  border-radius: 11px;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.nav-icon {
+  display: none;
+}
+
+.nav-btn.active {
+  color: var(--brand-dark);
+  background: #dfeae5;
+  box-shadow: inset 0 0 0 1px rgba(45, 102, 91, 0.12);
+}
+
+body.dark .nav-btn.active {
+  background: #2a3b36;
+}

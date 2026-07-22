@@ -55,6 +55,9 @@ export function createCloudRepository(request) {
     updateSettings(settings) {
       return request("/api/settings", { method: "PUT", body: settings });
     },
+    getSettings() {
+      return request("/api/settings");
+    },
     updatePet(pet) {
       return request("/api/pet", { method: "PUT", body: pet });
     },

@@ -1,0 +1,5 @@
+.primary-btn:disabled {
+  color: var(--muted);
+  background: var(--soft);
+  opacity: 1;
+}
